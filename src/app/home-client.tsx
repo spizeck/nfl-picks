@@ -6,6 +6,7 @@ import { Box, Spinner } from "@chakra-ui/react";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { AuthLanding } from "@/components/auth/auth-landing";
 import { Dashboard } from "@/components/dashboard/dashboard";
+import { AppShell } from "@/components/layout/app-shell";
 
 export default function HomeClient() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -33,15 +34,30 @@ export default function HomeClient() {
 
   if (!ready) {
     return (
-      <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
-        <Spinner size="xl" />
-      </Box>
+      <AppShell>
+        <Box
+          minH="60vh"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Spinner size="xl" />
+        </Box>
+      </AppShell>
     );
   }
 
   if (user) {
-    return <Dashboard user={user} />;
+    return (
+      <AppShell user={user}>
+        <Dashboard user={user} />
+      </AppShell>
+    );
   }
 
-  return <AuthLanding />;
+  return (
+    <AppShell>
+      <AuthLanding />
+    </AppShell>
+  );
 }

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
           const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
           
           if (cacheTime > oneHourAgo) {
-            return NextResponse.json(cachedData.games);
+            return NextResponse.json(cachedData.events || cachedData.games || []);
           }
         }
       }
@@ -44,61 +44,19 @@ export async function GET(request: NextRequest) {
     
     const data = await response.json();
     
-    // Transform the data to make it easier to work with
-    const games = data.events?.map((event: {
-      id: string;
-      date: string;
-      name: string;
-      shortName: string;
-      competitions: Array<{
-        competitors: Array<{
-          team: {
-            id: string;
-            displayName: string;
-            logo: string;
-          };
-          score?: number;
-          homeAway: string;
-        }>;
-      }>;
-      status: {
-        type: {
-          state: string;
-        };
-      };
-    }) => ({
-      id: event.id,
-      date: event.date,
-      name: event.name,
-      shortName: event.shortName,
-      teams: {
-        home: {
-          id: event.competitions[0].competitors[0].team.id,
-          name: event.competitions[0].competitors[0].team.displayName,
-          logo: event.competitions[0].competitors[0].team.logo,
-          score: event.competitions[0].competitors[0].score,
-        },
-        away: {
-          id: event.competitions[0].competitors[1].team.id,
-          name: event.competitions[0].competitors[1].team.displayName,
-          logo: event.competitions[0].competitors[1].team.logo,
-          score: event.competitions[0].competitors[1].score,
-        },
-      },
-      status: event.status.type.state,
-      completed: event.status.type.state === "post",
-    })) || [];
+    // Return raw ESPN events data
+    const events = data.events || [];
     
     // Cache the data in Firestore if available
     if (adminDb) {
       const cacheKey = `nfl-games-${year}-${week || "current"}`;
       await adminDb.collection("cache").doc(cacheKey).set({
-        games,
+        events,
         timestamp: Timestamp.now(),
       });
     }
     
-    return NextResponse.json(games);
+    return NextResponse.json(events);
   } catch (error) {
     console.error("Error fetching NFL games:", error);
     return NextResponse.json(

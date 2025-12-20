@@ -1,25 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Box, Container, Heading, VStack, HStack, Button, Text, Spinner } from "@chakra-ui/react";
+import { Box, Heading, VStack, HStack, Button, Text, Spinner } from "@chakra-ui/react";
 import { WeekSelector } from "./week-selector";
 import { LeaderboardCard } from "./leaderboard-card";
-import { GamesPicksCard } from "./games-picks-card";
+import { GamePickCard } from "./game-pick-card";
 import { getFirebaseAuth } from "@/lib/firebase";
+import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
 import type { User as FirebaseUser } from "firebase/auth";
-
-interface NFLGame {
-  id: string;
-  date: string;
-  name: string;
-  shortName: string;
-  teams: {
-    home: { id: string; name: string; logo: string; score?: number };
-    away: { id: string; name: string; logo: string; score?: number };
-  };
-  status: string;
-  completed: boolean;
-}
 
 interface UserPick {
   gameId: string;
@@ -28,24 +16,61 @@ interface UserPick {
 }
 
 export function Dashboard({ user }: { user: FirebaseUser }) {
-  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [currentYear] = useState(new Date().getFullYear());
-  const [games, setGames] = useState<NFLGame[]>([]);
-  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [games, setGames] = useState<NormalizedGame[]>([]);
+  const [picks, setPicks] = useState<Record<string, "away" | "home">>({});
   const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Initialize with current week on mount
+  useEffect(() => {
+    const fetchCurrentWeek = async () => {
+      try {
+        const response = await fetch(`/api/nfl-games?year=${currentYear}`);
+        if (response.ok) {
+          const rawEvents = await response.json();
+          if (rawEvents.length > 0) {
+            const normalized = rawEvents.map(normalizeESPNGame);
+            setGames(normalized);
+            const firstGameDate = new Date(rawEvents[0].date);
+            const seasonStart = new Date(currentYear, 8, 1);
+            const weeksSinceStart = Math.floor(
+              (firstGameDate.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
+            );
+            const currentWeek = Math.max(1, Math.min(18, weeksSinceStart + 1));
+            setSelectedWeek(currentWeek);
+          } else {
+            setSelectedWeek(1);
+          }
+        } else {
+          setSelectedWeek(1);
+        }
+      } catch (error) {
+        console.error("Error fetching current week:", error);
+        setSelectedWeek(1);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCurrentWeek();
+  }, [currentYear]);
+
   // Fetch games for selected week
   useEffect(() => {
+    if (selectedWeek === null) return;
+
     const fetchGames = async () => {
       setLoading(true);
       try {
         const response = await fetch(`/api/nfl-games?week=${selectedWeek}&year=${currentYear}`);
         if (response.ok) {
-          const data = await response.json();
-          setGames(data);
+          const rawEvents = await response.json();
+          const normalized = rawEvents.map(normalizeESPNGame);
+          setGames(normalized);
         }
       } catch (error) {
         console.error("Error fetching games:", error);
@@ -73,9 +98,9 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
 
         if (response.ok) {
           const data: UserPick[] = await response.json();
-          const picksMap: Record<string, string> = {};
+          const picksMap: Record<string, "away" | "home"> = {};
           data.forEach((pick) => {
-            picksMap[pick.gameId] = pick.selectedTeam;
+            picksMap[pick.gameId] = pick.selectedTeam as "away" | "home";
           });
           setPicks(picksMap);
           setSavedPicks(picksMap);
@@ -98,10 +123,10 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
     setHasUnsavedChanges(hasChanges);
   }, [picks, savedPicks]);
 
-  const handlePickChange = (gameId: string, teamId: string) => {
+  const handlePickChange = (gameId: string, side: "away" | "home") => {
     setPicks((prev) => ({
       ...prev,
-      [gameId]: teamId,
+      [gameId]: side,
     }));
   };
 
@@ -136,53 +161,77 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
   };
 
   return (
-    <Container bg="bg" maxW="container.lg" py={6}>
-      <VStack gap={6} align="stretch">
-        {/* Header */}
+    <VStack gap={6} align="stretch">
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        bg="bg.panel"
+        rounded="xl"
+        px={{ base: 4, md: 6 }}
+        py={{ base: 4, md: 5 }}
+        boxShadow="xs"
+      >
         <HStack justify="space-between" align="center">
-          <Heading size="xl" color="fg">
-            NFL Picks Challenge
+          <Heading size="lg" color="fg">
+            Weekly Picks
           </Heading>
           <Text color="fg.muted" fontSize="sm">
             {user.displayName || user.email}
           </Text>
         </HStack>
+      </Box>
 
-        {/* Week Selector */}
-        <WeekSelector
-          selectedWeek={selectedWeek}
-          onWeekChange={setSelectedWeek}
-        />
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        bg="bg.panel"
+        rounded="xl"
+        px={{ base: 4, md: 6 }}
+        py={{ base: 4, md: 5 }}
+        boxShadow="xs"
+      >
+        <WeekSelector selectedWeek={selectedWeek} onWeekChange={setSelectedWeek} />
+      </Box>
 
-        {/* Leaderboard Card */}
-        <LeaderboardCard />
+      <LeaderboardCard />
 
-        {/* Games & Picks Card */}
-        {loading ? (
-          <Box display="flex" justifyContent="center" py={8}>
-            <Spinner size="lg" colorPalette="blue" />
-          </Box>
-        ) : (
-          <GamesPicksCard
-            games={games}
-            picks={picks}
-            onPickChange={handlePickChange}
-          />
-        )}
+      {loading ? (
+        <Box
+          borderWidth="1px"
+          borderColor="border.muted"
+          rounded="xl"
+          bg="bg.panel"
+          py={10}
+          display="flex"
+          justifyContent="center"
+        >
+          <Spinner size="lg" colorPalette="blue" />
+        </Box>
+      ) : (
+        <VStack gap={3} align="stretch">
+          {games.map((game) => (
+            <GamePickCard
+              key={game.eventId}
+              game={game}
+              selectedSide={picks[game.eventId]}
+              onPickChange={handlePickChange}
+              disabled={game.status.state === "post"}
+            />
+          ))}
+        </VStack>
+      )}
 
-        {/* Save Button */}
-        {hasUnsavedChanges && (
-          <Button
-            onClick={handleSavePicks}
-            loading={saving}
-            colorPalette="blue"
-            size="lg"
-            w="full"
-          >
-            Save Picks
-          </Button>
-        )}
-      </VStack>
-    </Container>
+      {hasUnsavedChanges && (
+        <Button
+          onClick={handleSavePicks}
+          loading={saving}
+          colorPalette="blue"
+          size="lg"
+          alignSelf="flex-end"
+        >
+          Save Picks
+        </Button>
+      )}
+    </VStack>
   );
 }

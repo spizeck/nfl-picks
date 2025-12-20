@@ -41,11 +41,17 @@ const customConfig = defineConfig({
         "bg.muted": {
           value: { base: "{colors.gray.100}", _dark: "{colors.gray.900}" },
         },
+        "bg.panel": {
+          value: { base: "{colors.white}", _dark: "{colors.gray.900}" },
+        },
         fg: {
           value: { base: "{colors.gray.900}", _dark: "{colors.gray.50}" },
         },
         "fg.muted": {
           value: { base: "{colors.gray.600}", _dark: "{colors.gray.300}" },
+        },
+        "border.muted": {
+          value: { base: "{colors.gray.200}", _dark: "{colors.gray.800}" },
         },
       },
     },

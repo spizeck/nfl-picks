@@ -93,13 +93,14 @@ export function GamesPicksCard({ games, picks, onPickChange }: GamesPicksCardPro
                           if (details.value) onPickChange(game.id, details.value);
                         }}
                         disabled={game.completed}
+                        name={`game-${game.id}`}
                       >
                         <VStack gap={2} align="stretch">
                           {/* Away team */}
                           <RadioGroup.Item value={game.teams.away.id}>
-                            <HStack justify="space-between" w="full">
+                            <RadioGroup.ItemControl />
+                            <HStack justify="space-between" w="full" flex="1">
                               <HStack gap={3}>
-                                <RadioGroup.ItemControl />
                                 <Image
                                   src={game.teams.away.logo}
                                   alt={game.teams.away.name}
@@ -119,9 +120,9 @@ export function GamesPicksCard({ games, picks, onPickChange }: GamesPicksCardPro
 
                           {/* Home team */}
                           <RadioGroup.Item value={game.teams.home.id}>
-                            <HStack justify="space-between" w="full">
+                            <RadioGroup.ItemControl />
+                            <HStack justify="space-between" w="full" flex="1">
                               <HStack gap={3}>
-                                <RadioGroup.ItemControl />
                                 <Image
                                   src={game.teams.home.logo}
                                   alt={game.teams.home.name}

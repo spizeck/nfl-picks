@@ -3,7 +3,7 @@
 import { HStack, Button, Text } from "@chakra-ui/react";
 
 interface WeekSelectorProps {
-  selectedWeek: number;
+  selectedWeek: number | null;
   onWeekChange: (week: number) => void;
 }
 
