@@ -63,7 +63,17 @@ interface ESPNEvent {
  * Normalize ESPN event data into a clean game model
  */
 export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
+  // Validate event structure
+  if (!event.competitions || event.competitions.length === 0) {
+    throw new Error(`Invalid game data: missing competitions array for event ${event.id}`);
+  }
+
   const competition = event.competitions[0];
+  
+  if (!competition.competitors || competition.competitors.length === 0) {
+    throw new Error(`Invalid game data: missing competitors for event ${event.id}`);
+  }
+
   const competitors = competition.competitors;
 
   // Find away and home teams (ESPN ordering can vary)

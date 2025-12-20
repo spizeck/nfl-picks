@@ -12,18 +12,23 @@ export function WeekSelector({ selectedWeek, onWeekChange }: WeekSelectorProps) 
 
   return (
     <HStack gap={2} overflowX="auto" py={2}>
-      {weeks.map((week) => (
-        <Button
-          key={week}
-          onClick={() => onWeekChange(week)}
-          variant={selectedWeek === week ? "solid" : "outline"}
-          colorPalette="blue"
-          size="sm"
-          minW="60px"
-        >
-          <Text fontSize="sm">Week {week}</Text>
-        </Button>
-      ))}
+      {weeks.map((week) => {
+        const isSelected = selectedWeek === week;
+        return (
+          <Button
+            key={week}
+            onClick={() => onWeekChange(week)}
+            variant={isSelected ? "solid" : "outline"}
+            colorPalette="blue"
+            size="sm"
+            minW="60px"
+            borderWidth={isSelected ? "2px" : "1px"}
+            fontWeight={isSelected ? "bold" : "medium"}
+          >
+            <Text fontSize="sm">Week {week}</Text>
+          </Button>
+        );
+      })}
     </HStack>
   );
 }

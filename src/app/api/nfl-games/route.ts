@@ -20,14 +20,14 @@ export async function GET(request: NextRequest) {
       const cacheKey = `nfl-games-${year}-${week || "current"}`;
       const cacheDoc = await adminDb.collection("cache").doc(cacheKey).get();
       
-      // If cache exists and is less than 1 hour old, return it
+      // If cache exists and is less than 15 minutes old, return it
       if (cacheDoc.exists) {
         const cachedData = cacheDoc.data();
         if (cachedData && cachedData.timestamp) {
           const cacheTime = cachedData.timestamp.toDate();
-          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+          const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
           
-          if (cacheTime > oneHourAgo) {
+          if (cacheTime > fifteenMinutesAgo) {
             return NextResponse.json(cachedData.events || cachedData.games || []);
           }
         }

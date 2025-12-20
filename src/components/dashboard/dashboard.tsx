@@ -33,7 +33,17 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
         if (response.ok) {
           const rawEvents = await response.json();
           if (rawEvents.length > 0) {
-            const normalized = rawEvents.map(normalizeESPNGame);
+            const normalized = (rawEvents as any[])
+              .map((event) => {
+                try {
+                  return normalizeESPNGame(event);
+                } catch (err) {
+                  console.error("Error normalizing event:", err);
+                  return null;
+                }
+              })
+              .filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
+            
             setGames(normalized);
             const firstGameDate = new Date(rawEvents[0].date);
             const seasonStart = new Date(currentYear, 8, 1);
@@ -69,7 +79,16 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
         const response = await fetch(`/api/nfl-games?week=${selectedWeek}&year=${currentYear}`);
         if (response.ok) {
           const rawEvents = await response.json();
-          const normalized = rawEvents.map(normalizeESPNGame);
+          const normalized = (rawEvents as unknown[])
+            .map((event) => {
+              try {
+                return normalizeESPNGame(event);
+              } catch (err) {
+                console.error("Error normalizing event:", err);
+                return null;
+              }
+            })
+            .filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
           setGames(normalized);
         }
       } catch (error) {
@@ -201,11 +220,15 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
           borderColor="border.muted"
           rounded="xl"
           bg="bg.panel"
-          py={10}
+          py={16}
           display="flex"
           justifyContent="center"
+          alignItems="center"
         >
-          <Spinner size="lg" colorPalette="blue" />
+          <VStack gap={4}>
+            <Spinner size="xl" colorPalette="blue" />
+            <Text color="fg.muted" fontSize="sm">Loading games...</Text>
+          </VStack>
         </Box>
       ) : (
         <VStack gap={3} align="stretch">
