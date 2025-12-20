@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Box, Heading, VStack, HStack, Text, Spinner } from "@chakra-ui/react";
+import { Box, Heading, VStack, HStack, Text, Spinner, Button, Group } from "@chakra-ui/react";
 import { Collapsible } from "@chakra-ui/react";
 import { getFirestoreDb } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
@@ -14,11 +14,14 @@ interface LeaderboardEntry {
   winPercentage: number;
 }
 
+type TimePeriod = "week" | "season" | "allTime";
+
 export function LeaderboardCard() {
   const [open, setOpen] = useState(true);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<"wins" | "percentage">("wins");
+  const [sortBy, setSortBy] = useState<"wins" | "percentage">("percentage");
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("week");
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -106,26 +109,44 @@ export function LeaderboardCard() {
                 <Spinner size="md" colorPalette="blue" />
               </Box>
             ) : (
-              <VStack gap={3} align="stretch">
+              <VStack gap={4} align="stretch">
+                {/* Time period tabs */}
+                <Group attached w="full">
+                  <Button
+                    flex="1"
+                    onClick={() => setTimePeriod("week")}
+                    variant={timePeriod === "week" ? "solid" : "outline"}
+                    colorPalette="blue"
+                    size="sm"
+                  >
+                    Current Week
+                  </Button>
+                  <Button
+                    flex="1"
+                    onClick={() => setTimePeriod("season")}
+                    variant={timePeriod === "season" ? "solid" : "outline"}
+                    colorPalette="blue"
+                    size="sm"
+                  >
+                    Season
+                  </Button>
+                  <Button
+                    flex="1"
+                    onClick={() => setTimePeriod("allTime")}
+                    variant={timePeriod === "allTime" ? "solid" : "outline"}
+                    colorPalette="blue"
+                    size="sm"
+                  >
+                    All Time
+                  </Button>
+                </Group>
+
                 {/* Sort buttons */}
                 <HStack gap={2}>
                   <Text fontSize="sm" color="fg.muted">
                     Sort by:
                   </Text>
                   <HStack gap={1}>
-                    <Box
-                      as="button"
-                      onClick={() => setSortBy("wins")}
-                      px={2}
-                      py={1}
-                      rounded="md"
-                      bg={sortBy === "wins" ? "blue.subtle" : "transparent"}
-                      color={sortBy === "wins" ? "blue.fg" : "fg.muted"}
-                      fontSize="sm"
-                      _hover={{ bg: "bg.muted" }}
-                    >
-                      Wins
-                    </Box>
                     <Box
                       as="button"
                       onClick={() => setSortBy("percentage")}
@@ -135,9 +156,24 @@ export function LeaderboardCard() {
                       bg={sortBy === "percentage" ? "blue.subtle" : "transparent"}
                       color={sortBy === "percentage" ? "blue.fg" : "fg.muted"}
                       fontSize="sm"
+                      fontWeight={sortBy === "percentage" ? "bold" : "normal"}
                       _hover={{ bg: "bg.muted" }}
                     >
                       Win %
+                    </Box>
+                    <Box
+                      as="button"
+                      onClick={() => setSortBy("wins")}
+                      px={2}
+                      py={1}
+                      rounded="md"
+                      bg={sortBy === "wins" ? "blue.subtle" : "transparent"}
+                      color={sortBy === "wins" ? "blue.fg" : "fg.muted"}
+                      fontSize="sm"
+                      fontWeight={sortBy === "wins" ? "bold" : "normal"}
+                      _hover={{ bg: "bg.muted" }}
+                    >
+                      Wins
                     </Box>
                   </HStack>
                 </HStack>

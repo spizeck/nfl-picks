@@ -11,6 +11,7 @@ import { AppShell } from "@/components/layout/app-shell";
 export default function HomeClient() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [ready, setReady] = useState(() => !getFirebaseAuth());
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -49,8 +50,8 @@ export default function HomeClient() {
 
   if (user) {
     return (
-      <AppShell user={user}>
-        <Dashboard user={user} />
+      <AppShell user={user} selectedWeek={selectedWeek} onWeekChange={setSelectedWeek}>
+        <Dashboard user={user} selectedWeek={selectedWeek} onWeekChange={setSelectedWeek} />
       </AppShell>
     );
   }

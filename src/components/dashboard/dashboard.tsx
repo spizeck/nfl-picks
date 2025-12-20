@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Box, Heading, VStack, HStack, Button, Text, Spinner } from "@chakra-ui/react";
-import { WeekSelector } from "./week-selector";
 import { LeaderboardCard } from "./leaderboard-card";
 import { GamePickCard } from "./game-pick-card";
 import { getFirebaseAuth } from "@/lib/firebase";
@@ -15,8 +14,13 @@ interface UserPick {
   timestamp?: { seconds: number; nanoseconds: number };
 }
 
-export function Dashboard({ user }: { user: FirebaseUser }) {
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+interface DashboardProps {
+  user: FirebaseUser;
+  selectedWeek: number | null;
+  onWeekChange: (week: number) => void;
+}
+
+export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) {
   const [currentYear] = useState(new Date().getFullYear());
   const [games, setGames] = useState<NormalizedGame[]>([]);
   const [picks, setPicks] = useState<Record<string, "away" | "home">>({});
@@ -51,16 +55,20 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
               (firstGameDate.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
             );
             const currentWeek = Math.max(1, Math.min(18, weeksSinceStart + 1));
-            setSelectedWeek(currentWeek);
-          } else {
-            setSelectedWeek(1);
+            if (selectedWeek === null) {
+              onWeekChange(currentWeek);
+            }
+          } else if (selectedWeek === null) {
+            onWeekChange(1);
           }
-        } else {
-          setSelectedWeek(1);
+        } else if (selectedWeek === null) {
+          onWeekChange(1);
         }
       } catch (error) {
         console.error("Error fetching current week:", error);
-        setSelectedWeek(1);
+        if (selectedWeek === null) {
+          onWeekChange(1);
+        }
       } finally {
         setLoading(false);
       }
@@ -198,18 +206,6 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
             {user.displayName || user.email}
           </Text>
         </HStack>
-      </Box>
-
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        bg="bg.panel"
-        rounded="xl"
-        px={{ base: 4, md: 6 }}
-        py={{ base: 4, md: 5 }}
-        boxShadow="xs"
-      >
-        <WeekSelector selectedWeek={selectedWeek} onWeekChange={setSelectedWeek} />
       </Box>
 
       <LeaderboardCard />

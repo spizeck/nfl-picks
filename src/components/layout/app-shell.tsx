@@ -17,13 +17,16 @@ import { signOut } from "firebase/auth"
 
 import { ColorModeIcon, useColorMode } from "@/components/ui/color-mode"
 import { getFirebaseAuth } from "@/lib/firebase"
+import { WeekDropdown } from "./week-dropdown"
 
 interface AppShellProps {
   children: ReactNode
   user?: FirebaseUser | null
+  selectedWeek?: number | null
+  onWeekChange?: (week: number) => void
 }
 
-export function AppShell({ children, user }: AppShellProps) {
+export function AppShell({ children, user, selectedWeek, onWeekChange }: AppShellProps) {
   return (
     <Box bg="bg" color="fg" minH="100vh">
       <Container
@@ -33,7 +36,11 @@ export function AppShell({ children, user }: AppShellProps) {
         py={{ base: 4, md: 8 }}
       >
         <Flex direction="column" gap={6} minH="100%">
-          <AppHeader user={user ?? null} />
+          <AppHeader 
+            user={user ?? null} 
+            selectedWeek={selectedWeek}
+            onWeekChange={onWeekChange}
+          />
           <Box as="main" flex="1">
             {children}
           </Box>
@@ -43,7 +50,13 @@ export function AppShell({ children, user }: AppShellProps) {
   )
 }
 
-function AppHeader({ user }: { user: FirebaseUser | null }) {
+interface AppHeaderProps {
+  user: FirebaseUser | null
+  selectedWeek?: number | null
+  onWeekChange?: (week: number) => void
+}
+
+function AppHeader({ user, selectedWeek, onWeekChange }: AppHeaderProps) {
   const { toggleColorMode } = useColorMode()
   const [signingOut, setSigningOut] = useState(false)
 
@@ -91,6 +104,9 @@ function AppHeader({ user }: { user: FirebaseUser | null }) {
       <Spacer />
 
       <HStack gap={2}>
+        {user && selectedWeek !== undefined && onWeekChange && (
+          <WeekDropdown selectedWeek={selectedWeek} onWeekChange={onWeekChange} />
+        )}
         {user && (
           <Text color="fg.muted" fontSize="sm" display={{ base: "none", md: "block" }}>
             {user.displayName || user.email}
