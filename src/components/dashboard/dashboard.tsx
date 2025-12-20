@@ -136,7 +136,7 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
   };
 
   return (
-    <Container maxW="container.lg" py={6}>
+    <Container bg="bg" maxW="container.lg" py={6}>
       <VStack gap={6} align="stretch">
         {/* Header */}
         <HStack justify="space-between" align="center">
