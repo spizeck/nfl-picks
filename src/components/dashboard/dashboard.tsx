@@ -33,10 +33,10 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
         if (response.ok) {
           const rawEvents = await response.json();
           if (rawEvents.length > 0) {
-            const normalized = (rawEvents as any[])
+            const normalized = (rawEvents as Array<Record<string, unknown>>)
               .map((event) => {
                 try {
-                  return normalizeESPNGame(event);
+                  return normalizeESPNGame(event as never);
                 } catch (err) {
                   console.error("Error normalizing event:", err);
                   return null;
@@ -79,10 +79,10 @@ export function Dashboard({ user }: { user: FirebaseUser }) {
         const response = await fetch(`/api/nfl-games?week=${selectedWeek}&year=${currentYear}`);
         if (response.ok) {
           const rawEvents = await response.json();
-          const normalized = (rawEvents as unknown[])
+          const normalized = (rawEvents as Array<Record<string, unknown>>)
             .map((event) => {
               try {
-                return normalizeESPNGame(event);
+                return normalizeESPNGame(event as never);
               } catch (err) {
                 console.error("Error normalizing event:", err);
                 return null;
