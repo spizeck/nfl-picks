@@ -16,16 +16,17 @@ export async function GET(request: Request) {
 
     const adminDb = getAdminDb();
     if (!adminDb) {
-      return NextResponse.json(
-        { error: "Firebase Admin not configured" },
-        { status: 500 }
-      );
+      // Return empty picks object when Firebase Admin not configured
+      // This allows the feature to gracefully degrade on Vercel
+      console.warn("Firebase Admin not configured, returning empty picks");
+      return NextResponse.json({});
     }
 
-    // Fetch all games for the week to get game IDs
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const gamesResponse = await fetch(`${baseUrl}/api/nfl-games?week=${week}&year=${year}`);
-    const rawGames = await gamesResponse.json();
+    // Fetch games directly from ESPN to avoid localhost issues on Vercel
+    const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${year}&seasontype=2&week=${week}`;
+    const espnResponse = await fetch(espnUrl);
+    const espnData = await espnResponse.json();
+    const rawGames = espnData.events || [];
     
     const { normalizeESPNGame } = await import("@/lib/espn-data");
     const gameIds = new Set(

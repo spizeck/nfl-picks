@@ -65,7 +65,7 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
             <div className="flex flex-col items-center gap-0.5">
               <p className={cn(
                 "text-sm text-center leading-tight",
-                isAwaySelected ? "font-bold" : "font-medium"
+                isAwaySelected ? "font-bold text-foreground" : "font-medium text-muted-foreground"
               )}>
                 {game.away.name}
               </p>
@@ -141,7 +141,7 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
             <div className="flex flex-col items-center gap-0.5">
               <p className={cn(
                 "text-sm text-center leading-tight",
-                isHomeSelected ? "font-bold" : "font-medium"
+                isHomeSelected ? "font-bold text-foreground" : "font-medium text-muted-foreground"
               )}>
                 {game.home.name}
               </p>
