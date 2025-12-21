@@ -21,40 +21,61 @@ export function LeaderboardCard() {
   const [open, setOpen] = useState(true);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [sortBy, setSortBy] = useState<"wins" | "percentage">("percentage");
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("week");
 
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      const db = getFirestoreDb();
-      if (!db) return;
+  const fetchLeaderboard = async () => {
+    const db = getFirestoreDb();
+    if (!db) return;
 
-      try {
-        const usersSnapshot = await getDocs(collection(db, "users"));
-        const entries: LeaderboardEntry[] = [];
-        const currentYear = new Date().getFullYear();
+    try {
+      const usersSnapshot = await getDocs(collection(db, "users"));
+      const entries: LeaderboardEntry[] = [];
+      const currentYear = new Date().getFullYear();
 
-        for (const userDoc of usersSnapshot.docs) {
-          const userData = userDoc.data();
-          const stats = userData.stats?.[`season${currentYear}`] || { wins: 0, losses: 0 };
+      for (const userDoc of usersSnapshot.docs) {
+        const userData = userDoc.data();
+        const stats = userData.stats?.[`season${currentYear}`] || { wins: 0, losses: 0 };
 
-          entries.push({
-            uid: userDoc.id,
-            displayName: userData.displayName || "Anonymous",
-            wins: stats.wins || 0,
-            losses: stats.losses || 0,
-            winPercentage: stats.winPercentage || 0,
-          });
-        }
-
-        setLeaderboard(entries);
-      } catch (error) {
-        console.error("Error fetching leaderboard:", error);
-      } finally {
-        setLoading(false);
+        entries.push({
+          uid: userDoc.id,
+          displayName: userData.displayName || "Anonymous",
+          wins: stats.wins || 0,
+          losses: stats.losses || 0,
+          winPercentage: stats.winPercentage || 0,
+        });
       }
-    };
 
+      setLeaderboard(entries);
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStats = async () => {
+    setUpdating(true);
+    try {
+      const response = await fetch("/api/update-stats", { method: "POST" });
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`Updated stats for ${result.usersUpdated} users based on ${result.completedGames} completed games`);
+        // Refresh leaderboard after update
+        await fetchLeaderboard();
+      } else {
+        console.error("Failed to update stats:", result.error);
+      }
+    } catch (error) {
+      console.error("Error updating stats:", error);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  useEffect(() => {
     fetchLeaderboard();
   }, []);
 
@@ -68,16 +89,35 @@ export function LeaderboardCard() {
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="border rounded-lg overflow-hidden bg-card mb-4">
-        <CollapsibleTrigger asChild>
-          <div className="p-4 cursor-pointer hover:bg-muted transition-colors border-b">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Leaderboard</h3>
-              <span className="text-muted-foreground">
-                {open ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-              </span>
-            </div>
-          </div>
-        </CollapsibleTrigger>
+        <div className="flex items-center justify-between border-b bg-card">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="flex-1 flex items-center justify-start p-4 hover:bg-muted"
+            >
+              <div className="flex items-center gap-2">
+                {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <h2 className="text-lg font-semibold text-foreground">Leaderboard</h2>
+              </div>
+            </Button>
+          </CollapsibleTrigger>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={updateStats}
+            disabled={updating}
+            className="text-xs mr-4"
+          >
+            {updating ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              "Update Stats"
+            )}
+          </Button>
+        </div>
 
         <CollapsibleContent>
           <div className="p-4 space-y-4">
