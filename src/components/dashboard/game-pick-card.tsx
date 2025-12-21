@@ -2,19 +2,33 @@
 
 import type { NormalizedGame } from "@/lib/espn-data";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+interface UserPickInfo {
+  userId: string;
+  displayName: string;
+  photoURL: string;
+  selectedTeam: string;
+}
 
 interface GamePickCardProps {
   game: NormalizedGame;
   selectedSide?: "away" | "home";
   onPickChange: (gameId: string, side: "away" | "home") => void;
   disabled?: boolean;
+  userPicks?: UserPickInfo[];
 }
 
-export function GamePickCard({ game, selectedSide, onPickChange, disabled }: GamePickCardProps) {
+export function GamePickCard({ game, selectedSide, onPickChange, disabled, userPicks = [] }: GamePickCardProps) {
   const isAwaySelected = selectedSide === "away";
   const isHomeSelected = selectedSide === "home";
   const isGameLive = game.status.state === "in";
   const isGameFinal = game.status.state === "post";
+  const isGameLocked = isGameLive || isGameFinal;
+
+  // Filter picks by team for locked games
+  const awayPicks = isGameLocked ? userPicks.filter(p => p.selectedTeam === game.away.id) : [];
+  const homePicks = isGameLocked ? userPicks.filter(p => p.selectedTeam === game.home.id) : [];
 
   const handleAwayClick = () => {
     if (!disabled) {
@@ -61,6 +75,18 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled }: Gam
                 </p>
               )}
             </div>
+            {isGameLocked && awayPicks.length > 0 && (
+              <div className="flex gap-1 mt-1">
+                {awayPicks.map((pick) => (
+                  <Avatar key={pick.userId} className="h-6 w-6 border-2 border-background">
+                    <AvatarImage src={pick.photoURL} alt={pick.displayName} />
+                    <AvatarFallback className="text-xs">
+                      {pick.displayName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+              </div>
+            )}
           </div>
         </button>
 
@@ -125,6 +151,18 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled }: Gam
                 </p>
               )}
             </div>
+            {isGameLocked && homePicks.length > 0 && (
+              <div className="flex gap-1 mt-1">
+                {homePicks.map((pick) => (
+                  <Avatar key={pick.userId} className="h-6 w-6 border-2 border-background">
+                    <AvatarImage src={pick.photoURL} alt={pick.displayName} />
+                    <AvatarFallback className="text-xs">
+                      {pick.displayName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+              </div>
+            )}
           </div>
         </button>
       </div>

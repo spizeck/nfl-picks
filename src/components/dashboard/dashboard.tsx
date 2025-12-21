@@ -16,6 +16,13 @@ interface UserPick {
   timestamp?: { seconds: number; nanoseconds: number };
 }
 
+interface UserPickInfo {
+  userId: string;
+  displayName: string;
+  photoURL: string;
+  selectedTeam: string;
+}
+
 interface DashboardProps {
   user: FirebaseUser;
   selectedWeek: number | null;
@@ -27,6 +34,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
   const [games, setGames] = useState<NormalizedGame[]>([]);
   const [picks, setPicks] = useState<Record<string, "away" | "home">>({});
   const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});
+  const [allUsersPicks, setAllUsersPicks] = useState<Record<string, UserPickInfo[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -106,7 +114,20 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
       }
     };
 
+    const fetchAllPicks = async () => {
+      try {
+        const response = await fetch(`/api/all-picks?week=${selectedWeek}&year=${currentYear}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAllUsersPicks(data);
+        }
+      } catch (error) {
+        console.error("Error fetching all picks:", error);
+      }
+    };
+
     fetchGames();
+    fetchAllPicks();
   }, [selectedWeek, currentYear]);
 
   useEffect(() => {
@@ -125,9 +146,25 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
         if (response.ok) {
           const data: UserPick[] = await response.json();
           const picksMap: Record<string, "away" | "home"> = {};
+          
+          // Convert team ID picks to home/away for display
           data.forEach((pick) => {
-            picksMap[pick.gameId] = pick.selectedTeam as "away" | "home";
+            // If pick is already "home" or "away", use it directly
+            if (pick.selectedTeam === "home" || pick.selectedTeam === "away") {
+              picksMap[pick.gameId] = pick.selectedTeam;
+            } else {
+              // Otherwise, it's a team ID - convert to home/away by matching against game
+              const game = games.find(g => g.eventId === pick.gameId);
+              if (game) {
+                if (pick.selectedTeam === game.home.id) {
+                  picksMap[pick.gameId] = "home";
+                } else if (pick.selectedTeam === game.away.id) {
+                  picksMap[pick.gameId] = "away";
+                }
+              }
+            }
           });
+          
           setPicks(picksMap);
           setSavedPicks(picksMap);
         }
@@ -137,7 +174,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     };
 
     fetchPicks();
-  }, []);
+  }, [games]);
 
   useEffect(() => {
     const hasChanges = Object.keys(picks).some(
@@ -216,6 +253,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
             selectedSide={picks[game.eventId]}
             onPickChange={handlePickChange}
             disabled={game.status.state !== "pre"}
+            userPicks={allUsersPicks[game.eventId] || []}
           />
         ))}
       </div>
