@@ -196,10 +196,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b bg-card p-4 mb-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-semibold">
-            Week {selectedWeek}
-          </h2>
-          <WeekDropdown selectedWeek={selectedWeek} onWeekChange={onWeekChange} />
+                    <WeekDropdown selectedWeek={selectedWeek} onWeekChange={onWeekChange} />
         </div>
         {hasUnsavedChanges && (
           <Button onClick={handleSavePicks} disabled={saving} className="font-semibold">

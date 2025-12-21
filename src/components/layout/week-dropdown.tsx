@@ -23,7 +23,7 @@ export function WeekDropdown({ selectedWeek, onWeekChange }: WeekDropdownProps) 
           {selectedWeek ? `Week ${selectedWeek}` : "Select Week"}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="max-h-[300px] overflow-y-auto">
+      <DropdownMenuContent className="max-h-300px overflow-y-auto">
         {weeks.map((week) => (
           <DropdownMenuItem
             key={week}

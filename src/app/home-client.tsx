@@ -45,7 +45,7 @@ export default function HomeClient() {
 
   if (user) {
     return (
-      <AppShell user={user} selectedWeek={selectedWeek} onWeekChange={setSelectedWeek}>
+      <AppShell user={user}>
         <Dashboard user={user} selectedWeek={selectedWeek} onWeekChange={setSelectedWeek} />
       </AppShell>
     );
