@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import {
   signInWithPopup,
 } from "firebase/auth";
-import { getFirebaseAuth, getGoogleProvider } from "@/lib/firebase";
+import { getFirebaseAuth, getGoogleProvider, getFirestoreDb } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import type { User as FirebaseUser } from "firebase/auth";
@@ -48,6 +49,7 @@ export function AuthLanding() {
   const handleGoogleSignIn = async () => {
     const auth = getFirebaseAuth();
     const googleProvider = getGoogleProvider();
+    const db = getFirestoreDb();
     if (!auth || !googleProvider) {
       console.error("Firebase auth not initialized");
       return;
@@ -57,6 +59,18 @@ export function AuthLanding() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      
+      // Create/update user profile in Firestore
+      if (db) {
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || user.email?.split('@')[0] || "Anonymous",
+          photoURL: user.photoURL,
+          lastSignIn: new Date(),
+        }, { merge: true });
+      }
+      
       setUser({
         uid: user.uid,
         email: user.email,

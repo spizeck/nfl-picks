@@ -32,21 +32,18 @@ export function LeaderboardCard() {
       try {
         const usersSnapshot = await getDocs(collection(db, "users"));
         const entries: LeaderboardEntry[] = [];
+        const currentYear = new Date().getFullYear();
 
         for (const userDoc of usersSnapshot.docs) {
-          const picksSnapshot = await getDocs(
-            collection(db, "users", userDoc.id, "picks")
-          );
-
-          const wins = 0;
-          const losses = 0;
+          const userData = userDoc.data();
+          const stats = userData.stats?.[`season${currentYear}`] || { wins: 0, losses: 0 };
 
           entries.push({
             uid: userDoc.id,
-            displayName: userDoc.data().displayName || "Anonymous",
-            wins,
-            losses,
-            winPercentage: wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0,
+            displayName: userData.displayName || "Anonymous",
+            wins: stats.wins || 0,
+            losses: stats.losses || 0,
+            winPercentage: stats.winPercentage || 0,
           });
         }
 
