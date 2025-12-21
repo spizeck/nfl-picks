@@ -7,24 +7,19 @@ import { Button } from "@/components/ui/button"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { getFirebaseAuth } from "@/lib/firebase"
-import { WeekDropdown } from "./week-dropdown"
 
 interface AppShellProps {
   children: ReactNode
   user?: FirebaseUser | null
-  selectedWeek?: number | null
-  onWeekChange?: (week: number) => void
 }
 
-export function AppShell({ children, user, selectedWeek, onWeekChange }: AppShellProps) {
+export function AppShell({ children, user }: AppShellProps) {
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-7xl mx-auto min-h-screen px-4 md:px-8 lg:px-12 py-6 md:py-8">
         <div className="flex flex-col gap-8 min-h-full">
           <AppHeader 
-            user={user ?? null} 
-            selectedWeek={selectedWeek}
-            onWeekChange={onWeekChange}
+            user={user ?? null}
           />
           <main className="flex-1 pb-8">
             {children}
@@ -37,11 +32,9 @@ export function AppShell({ children, user, selectedWeek, onWeekChange }: AppShel
 
 interface AppHeaderProps {
   user: FirebaseUser | null
-  selectedWeek?: number | null
-  onWeekChange?: (week: number) => void
 }
 
-function AppHeader({ user, selectedWeek, onWeekChange }: AppHeaderProps) {
+function AppHeader({ user }: AppHeaderProps) {
   const { theme, setTheme } = useTheme()
   const [signingOut, setSigningOut] = useState(false)
 
@@ -77,9 +70,6 @@ function AppHeader({ user, selectedWeek, onWeekChange }: AppHeaderProps) {
       <div className="flex-1" />
 
       <div className="flex items-center gap-2 md:gap-3">
-        {user && selectedWeek !== undefined && onWeekChange && (
-          <WeekDropdown selectedWeek={selectedWeek} onWeekChange={onWeekChange} />
-        )}
         {user && (
           <span className="text-sm text-muted-foreground px-2 py-1">
             {user.displayName || user.email}

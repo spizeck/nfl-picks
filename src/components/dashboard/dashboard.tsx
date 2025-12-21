@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { LeaderboardCard } from "./leaderboard-card";
 import { GamePickCard } from "./game-pick-card";
+import { WeekDropdown } from "../layout/week-dropdown";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
 import type { User as FirebaseUser } from "firebase/auth";
@@ -193,10 +194,13 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="flex items-center justify-between border-b bg-card p-4 mb-4">
-        <h2 className="text-2xl font-semibold">
-          Week {selectedWeek}
-        </h2>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b bg-card p-4 mb-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-semibold">
+            Week {selectedWeek}
+          </h2>
+          <WeekDropdown selectedWeek={selectedWeek} onWeekChange={onWeekChange} />
+        </div>
         {hasUnsavedChanges && (
           <Button onClick={handleSavePicks} disabled={saving} className="font-semibold">
             {saving && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}

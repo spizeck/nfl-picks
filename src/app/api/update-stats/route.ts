@@ -12,33 +12,45 @@ export async function POST() {
       );
     }
 
-    // Fetch all completed games from ESPN API
-    const gamesResponse = await fetch(
-      `${
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-      }/api/nfl-games`
-    );
-    const rawEvents = await gamesResponse.json();
-
+    // Fetch all completed games from ALL weeks of the season
+    const currentYear = new Date().getFullYear();
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    
     // Import normalizeESPNGame dynamically to avoid client-side imports
     const { normalizeESPNGame } = await import("@/lib/espn-data");
+    
+    const allCompletedGames: NormalizedGame[] = [];
+    
+    // Fetch games from all 18 weeks
+    for (let week = 1; week <= 18; week++) {
+      try {
+        const gamesResponse = await fetch(
+          `${baseUrl}/api/nfl-games?week=${week}&year=${currentYear}`
+        );
+        const rawEvents = await gamesResponse.json();
 
-    const normalizedGames = (rawEvents as Array<Record<string, unknown>>)
-      .map((event) => {
-        try {
-          return normalizeESPNGame(event as never);
-        } catch (err) {
-          console.error("Error normalizing event:", err);
-          return null;
-        }
-      })
-      .filter((game): game is NormalizedGame => game !== null);
+        const normalizedGames = (rawEvents as Array<Record<string, unknown>>)
+          .map((event) => {
+            try {
+              return normalizeESPNGame(event as never);
+            } catch (err) {
+              console.error("Error normalizing event:", err);
+              return null;
+            }
+          })
+          .filter((game): game is NormalizedGame => game !== null);
 
-    const completedGames = normalizedGames.filter(
-      (game) => game.status.state === "post"
-    );
+        const completedGames = normalizedGames.filter(
+          (game) => game.status.state === "post"
+        );
+        
+        allCompletedGames.push(...completedGames);
+      } catch (err) {
+        console.error(`Error fetching week ${week}:`, err);
+      }
+    }
 
-    console.log(`Processing ${completedGames.length} completed games`);
+    console.log(`Processing ${allCompletedGames.length} completed games from entire season`);
 
     // Get all users
     const usersSnapshot = await adminDb.collection("users").get();
@@ -60,7 +72,7 @@ export async function POST() {
       // Calculate wins/losses for each pick
       picksSnapshot.docs.forEach((pickDoc) => {
         const pick = pickDoc.data();
-        const game = completedGames.find((g) => g.eventId === pick.gameId);
+        const game = allCompletedGames.find((g) => g.eventId === pick.gameId);
 
         if (game) {
           const homeScore = game.home.score ?? 0;
@@ -89,7 +101,6 @@ export async function POST() {
       });
 
       // Update user stats
-      const currentYear = new Date().getFullYear();
       const updatePromise = adminDb
         .collection("users")
         .doc(userId)
@@ -126,7 +137,7 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       usersUpdated: usersSnapshot.docs.length,
-      completedGames: completedGames.length,
+      completedGames: allCompletedGames.length,
     });
   } catch (error) {
     console.error("Error updating stats:", error);
