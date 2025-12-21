@@ -4,6 +4,7 @@ import type { NormalizedGame } from "@/lib/espn-data";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
+import { Check, X } from "lucide-react";
 
 interface UserPickInfo {
   userId: string;
@@ -30,6 +31,24 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
   // Filter picks by team for locked games
   const awayPicks = isGameLocked ? userPicks.filter(p => p.selectedTeam === game.away.id) : [];
   const homePicks = isGameLocked ? userPicks.filter(p => p.selectedTeam === game.home.id) : [];
+
+  // Determine if user picked correctly (only for final games)
+  let userPickedCorrectly: boolean | null = null;
+  if (isGameFinal && selectedSide && game.away.score !== undefined && game.home.score !== undefined) {
+    // Convert scores to numbers for proper comparison
+    const awayScore = Number(game.away.score);
+    const homeScore = Number(game.home.score);
+    
+    // Determine which team won based on scores
+    const winningTeamId = awayScore > homeScore ? game.away.id : 
+                         homeScore > awayScore ? game.home.id : null;
+    
+    // Get the team ID the user selected
+    const userSelectedTeamId = selectedSide === "away" ? game.away.id : game.home.id;
+    
+    // User picked correctly if their selected team won
+    userPickedCorrectly = winningTeamId !== null && userSelectedTeamId === winningTeamId;
+  }
 
   const handleAwayClick = () => {
     if (!disabled) {
@@ -97,6 +116,15 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
         <div className="flex flex-col items-center justify-center px-4 py-2 gap-1 bg-background">
           {isGameFinal ? (
             <>
+              {userPickedCorrectly !== null && (
+                <div className="mb-1">
+                  {userPickedCorrectly ? (
+                    <Check className="h-6 w-6 text-green-600" strokeWidth={3} />
+                  ) : (
+                    <X className="h-6 w-6 text-red-600" strokeWidth={3} />
+                  )}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground font-medium">
                 Final
               </p>

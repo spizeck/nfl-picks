@@ -113,8 +113,9 @@ export async function POST() {
         const game = allCompletedGames.find((g) => g.eventId === pick.gameId);
 
         if (game) {
-          const homeScore = game.home.score ?? 0;
-          const awayScore = game.away.score ?? 0;
+          // Convert scores to numbers for proper comparison
+          const homeScore = Number(game.home.score ?? 0);
+          const awayScore = Number(game.away.score ?? 0);
 
           // Determine winning team ID
           let winningTeamId: string | null = null;
