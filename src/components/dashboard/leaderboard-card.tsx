@@ -193,7 +193,7 @@ export function LeaderboardCard() {
                       <span className="text-muted-foreground font-medium">
                         {entry.wins}W - {entry.losses}L
                       </span>
-                      <span className="font-bold text-base min-w-[50px] text-right">
+                      <span className="font-bold text-base min-w-50px text-right">
                         {entry.winPercentage.toFixed(1)}%
                       </span>
                     </div>

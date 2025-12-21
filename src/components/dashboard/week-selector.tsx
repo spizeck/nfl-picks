@@ -20,7 +20,7 @@ export function WeekSelector({ selectedWeek, onWeekChange }: WeekSelectorProps) 
             onClick={() => onWeekChange(week)}
             variant={isSelected ? "default" : "outline"}
             size="sm"
-            className={`min-w-[60px] ${isSelected ? 'font-bold' : 'font-medium'}`}
+            className={`min-w-60px ${isSelected ? 'font-bold' : 'font-medium'}`}
           >
             Week {week}
           </Button>

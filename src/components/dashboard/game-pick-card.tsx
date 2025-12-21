@@ -3,6 +3,7 @@
 import type { NormalizedGame } from "@/lib/espn-data";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Image from "next/image";
 
 interface UserPickInfo {
   userId: string;
@@ -44,7 +45,7 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
 
   return (
     <div className="border rounded-none border-b-0 last:border-b overflow-hidden bg-card hover:bg-muted/50 transition-colors">
-      <div className="grid grid-cols-3 items-stretch min-h-[120px]">
+      <div className="grid grid-cols-3 items-stretch min-h-120px">
         {/* LEFT: Away Team */}
         <button
           onClick={handleAwayClick}
@@ -57,9 +58,11 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
           aria-pressed={isAwaySelected}
         >
           <div className="flex flex-col items-center justify-center h-full gap-2">
-            <img
+            <Image
               src={game.away.logo}
               alt={game.away.name}
+              width={40}
+              height={40}
               className="h-10 w-10 object-contain"
             />
             <div className="flex flex-col items-center gap-0.5">
@@ -133,9 +136,11 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
           aria-pressed={isHomeSelected}
         >
           <div className="flex flex-col items-center justify-center h-full gap-2">
-            <img
+            <Image
               src={game.home.logo}
               alt={game.home.name}
+              width={40}
+              height={40}
               className="h-10 w-10 object-contain"
             />
             <div className="flex flex-col items-center gap-0.5">

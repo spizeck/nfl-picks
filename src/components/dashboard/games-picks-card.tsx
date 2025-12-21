@@ -1,13 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
-interface NFLGame {
-  id: string;
-  name: string;
-  date: string;
-}
-
 export function GamesPicksCard() {
   return (
     <div className="border rounded-lg p-4 bg-card">
