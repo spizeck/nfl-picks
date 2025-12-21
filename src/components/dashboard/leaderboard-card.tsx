@@ -21,7 +21,6 @@ export function LeaderboardCard() {
   const [open, setOpen] = useState(true);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
   const [sortBy, setSortBy] = useState<"wins" | "percentage">("percentage");
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("season");
   const [showAll, setShowAll] = useState(false);
@@ -66,27 +65,26 @@ export function LeaderboardCard() {
   };
 
   const updateStats = async () => {
-    setUpdating(true);
     try {
       const response = await fetch("/api/update-stats", { method: "POST" });
       const result = await response.json();
       
       if (result.success) {
         console.log(`Updated stats for ${result.usersUpdated} users based on ${result.completedGames} completed games`);
-        // Refresh leaderboard after update
-        await fetchLeaderboard();
       } else {
         console.error("Failed to update stats:", result.error);
       }
     } catch (error) {
       console.error("Error updating stats:", error);
-    } finally {
-      setUpdating(false);
     }
   };
 
   useEffect(() => {
-    fetchLeaderboard();
+    const loadData = async () => {
+      await updateStats();
+      await fetchLeaderboard();
+    };
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timePeriod]);
 
@@ -115,24 +113,6 @@ export function LeaderboardCard() {
               </div>
             </Button>
           </CollapsibleTrigger>
-          <div className="flex gap-2 mr-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={updateStats}
-              disabled={updating}
-              className="text-xs"
-            >
-              {updating ? (
-                <>
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Update Stats"
-              )}
-            </Button>
-          </div>
         </div>
 
         <CollapsibleContent>

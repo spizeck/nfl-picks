@@ -12,11 +12,34 @@ export async function POST() {
       );
     }
 
-    // Fetch all completed games from ALL weeks of the season
     const currentYear = new Date().getFullYear();
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     
-    // Import normalizeESPNGame dynamically to avoid client-side imports
+    // Check last update timestamp from a metadata document
+    const metadataRef = adminDb.collection("metadata").doc("statsUpdate");
+    const metadataDoc = await metadataRef.get();
+    const lastUpdate = metadataDoc.exists ? metadataDoc.data()?.lastUpdate?.toDate() : null;
+    const lastCompletedGamesCount = metadataDoc.exists ? metadataDoc.data()?.completedGamesCount || 0 : 0;
+    
+    // Rate limit: Don't update more than once per minute
+    if (lastUpdate) {
+      const timeSinceLastUpdate = Date.now() - lastUpdate.getTime();
+      const oneMinuteInMs = 60 * 1000;
+      
+      if (timeSinceLastUpdate < oneMinuteInMs) {
+        const secondsRemaining = Math.ceil((oneMinuteInMs - timeSinceLastUpdate) / 1000);
+        console.log(`Rate limit: Last update was ${Math.floor(timeSinceLastUpdate / 1000)}s ago. Try again in ${secondsRemaining}s.`);
+        return NextResponse.json({
+          success: true,
+          usersUpdated: 0,
+          completedGames: lastCompletedGamesCount,
+          rateLimited: true,
+          message: `Rate limited. Try again in ${secondsRemaining} seconds.`,
+          secondsRemaining
+        });
+      }
+    }
+    
     const { normalizeESPNGame } = await import("@/lib/espn-data");
     
     const allCompletedGames: NormalizedGame[] = [];
@@ -50,11 +73,26 @@ export async function POST() {
       }
     }
 
-    console.log(`Processing ${allCompletedGames.length} completed games from entire season`);
+    console.log(`Total completed games: ${allCompletedGames.length}, Last count: ${lastCompletedGamesCount}`);
+    
+    // Early exit if no new completed games
+    if (allCompletedGames.length === lastCompletedGamesCount && lastUpdate) {
+      console.log("No new completed games since last update. Skipping stats update.");
+      return NextResponse.json({
+        success: true,
+        usersUpdated: 0,
+        completedGames: allCompletedGames.length,
+        skipped: true,
+        message: "No changes detected"
+      });
+    }
+    
+    console.log(`Processing ${allCompletedGames.length} completed games (${allCompletedGames.length - lastCompletedGamesCount} new)`);
 
     // Get all users
     const usersSnapshot = await adminDb.collection("users").get();
     const updates: Promise<unknown>[] = [];
+    let usersUpdatedCount = 0;
 
     for (const userDoc of usersSnapshot.docs) {
       const userId = userDoc.id;
@@ -105,44 +143,62 @@ export async function POST() {
         }
       });
 
-      // Update user stats
-      const updatePromise = adminDb
-        .collection("users")
-        .doc(userId)
-        .set(
-          {
-            stats: {
-              [`season${currentYear}`]: {
-                wins: seasonWins,
-                losses: seasonLosses,
-                winPercentage:
-                  seasonWins + seasonLosses > 0
-                    ? (seasonWins / (seasonWins + seasonLosses)) * 100
-                    : 0,
+      // Check if stats have changed before updating
+      const userData = userDoc.data();
+      const currentStats = userData.stats?.[`season${currentYear}`];
+      const statsChanged = 
+        !currentStats ||
+        currentStats.wins !== seasonWins ||
+        currentStats.losses !== seasonLosses;
+      
+      if (statsChanged) {
+        const updatePromise = adminDb
+          .collection("users")
+          .doc(userId)
+          .set(
+            {
+              stats: {
+                [`season${currentYear}`]: {
+                  wins: seasonWins,
+                  losses: seasonLosses,
+                  winPercentage:
+                    seasonWins + seasonLosses > 0
+                      ? (seasonWins / (seasonWins + seasonLosses)) * 100
+                      : 0,
+                },
+                allTime: {
+                  wins: seasonWins,
+                  losses: seasonLosses,
+                  winPercentage:
+                    seasonWins + seasonLosses > 0
+                      ? (seasonWins / (seasonWins + seasonLosses)) * 100
+                      : 0,
+                },
               },
-              allTime: {
-                wins: seasonWins,
-                losses: seasonLosses,
-                winPercentage:
-                  seasonWins + seasonLosses > 0
-                    ? (seasonWins / (seasonWins + seasonLosses)) * 100
-                    : 0,
-              },
+              lastStatsUpdate: new Date(),
             },
-            lastStatsUpdate: new Date(),
-          },
-          { merge: true }
-        );
+            { merge: true }
+          );
 
-      updates.push(updatePromise);
+        updates.push(updatePromise);
+        usersUpdatedCount++;
+      }
     }
 
     await Promise.all(updates);
+    
+    // Update metadata with current timestamp and game count
+    await metadataRef.set({
+      lastUpdate: new Date(),
+      completedGamesCount: allCompletedGames.length,
+    }, { merge: true });
 
     return NextResponse.json({
       success: true,
-      usersUpdated: usersSnapshot.docs.length,
+      usersUpdated: usersUpdatedCount,
+      totalUsers: usersSnapshot.docs.length,
       completedGames: allCompletedGames.length,
+      newGames: allCompletedGames.length - lastCompletedGamesCount,
     });
   } catch (error) {
     console.error("Error updating stats:", error);
