@@ -1,20 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
-
-interface NormalizedGame {
-  eventId: string;
-  away: {
-    id: string;
-    score?: number;
-  };
-  home: {
-    id: string;
-    score?: number;
-  };
-  status: {
-    state: "pre" | "in" | "post";
-  };
-}
+import type { NormalizedGame } from "@/lib/espn-data";
 
 export async function POST() {
   try {
@@ -28,13 +14,15 @@ export async function POST() {
 
     // Fetch all completed games from ESPN API
     const gamesResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/nfl-games`
+      `${
+        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+      }/api/nfl-games`
     );
     const rawEvents = await gamesResponse.json();
 
     // Import normalizeESPNGame dynamically to avoid client-side imports
     const { normalizeESPNGame } = await import("@/lib/espn-data");
-    
+
     const normalizedGames = (rawEvents as Array<Record<string, unknown>>)
       .map((event) => {
         try {
@@ -46,7 +34,9 @@ export async function POST() {
       })
       .filter((game): game is NormalizedGame => game !== null);
 
-    const completedGames = normalizedGames.filter((game) => game.status.state === "post");
+    const completedGames = normalizedGames.filter(
+      (game) => game.status.state === "post"
+    );
 
     console.log(`Processing ${completedGames.length} completed games`);
 
@@ -56,7 +46,7 @@ export async function POST() {
 
     for (const userDoc of usersSnapshot.docs) {
       const userId = userDoc.id;
-      
+
       // Get user's picks
       const picksSnapshot = await adminDb
         .collection("users")
@@ -64,8 +54,6 @@ export async function POST() {
         .collection("picks")
         .get();
 
-      let weekWins = 0;
-      let weekLosses = 0;
       let seasonWins = 0;
       let seasonLosses = 0;
 
@@ -88,14 +76,13 @@ export async function POST() {
           if (winningSide) {
             const userPickedCorrectly =
               pick.selectedTeam === winningSide ||
-              pick.selectedTeam === (winningSide === "home" ? game.home.id : game.away.id);
+              pick.selectedTeam ===
+                (winningSide === "home" ? game.home.id : game.away.id);
 
             if (userPickedCorrectly) {
               seasonWins++;
-              weekWins++;
             } else {
               seasonLosses++;
-              weekLosses++;
             }
           }
         }
@@ -112,16 +99,18 @@ export async function POST() {
               [`season${currentYear}`]: {
                 wins: seasonWins,
                 losses: seasonLosses,
-                winPercentage: seasonWins + seasonLosses > 0 
-                  ? (seasonWins / (seasonWins + seasonLosses)) * 100 
-                  : 0,
+                winPercentage:
+                  seasonWins + seasonLosses > 0
+                    ? (seasonWins / (seasonWins + seasonLosses)) * 100
+                    : 0,
               },
               allTime: {
                 wins: seasonWins,
                 losses: seasonLosses,
-                winPercentage: seasonWins + seasonLosses > 0 
-                  ? (seasonWins / (seasonWins + seasonLosses)) * 100 
-                  : 0,
+                winPercentage:
+                  seasonWins + seasonLosses > 0
+                    ? (seasonWins / (seasonWins + seasonLosses)) * 100
+                    : 0,
               },
             },
             lastStatsUpdate: new Date(),
@@ -142,7 +131,10 @@ export async function POST() {
   } catch (error) {
     console.error("Error updating stats:", error);
     return NextResponse.json(
-      { error: "Failed to update stats", details: error instanceof Error ? error.message : String(error) },
+      {
+        error: "Failed to update stats",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
