@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Box, Heading, VStack, HStack, Button, Text, Spinner } from "@chakra-ui/react";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { LeaderboardCard } from "./leaderboard-card";
 import { GamePickCard } from "./game-pick-card";
 import { getFirebaseAuth } from "@/lib/firebase";
@@ -29,7 +30,6 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Initialize with current week on mount
   useEffect(() => {
     const fetchCurrentWeek = async () => {
       try {
@@ -77,7 +77,6 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     fetchCurrentWeek();
   }, [currentYear]);
 
-  // Fetch games for selected week
   useEffect(() => {
     if (selectedWeek === null) return;
 
@@ -109,7 +108,6 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     fetchGames();
   }, [selectedWeek, currentYear]);
 
-  // Fetch user's saved picks
   useEffect(() => {
     const fetchPicks = async () => {
       const auth = getFirebaseAuth();
@@ -140,7 +138,6 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     fetchPicks();
   }, []);
 
-  // Check for unsaved changes
   useEffect(() => {
     const hasChanges = Object.keys(picks).some(
       (gameId) => picks[gameId] !== savedPicks[gameId]
@@ -165,7 +162,6 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     try {
       const token = await auth.currentUser.getIdToken();
 
-      // Save each pick
       const savePromises = Object.entries(picks).map(([gameId, selectedTeam]) =>
         fetch("/api/user-picks", {
           method: "POST",
@@ -178,7 +174,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
       );
 
       await Promise.all(savePromises);
-      setSavedPicks({ ...picks });
+      setSavedPicks(picks);
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error("Error saving picks:", error);
@@ -187,70 +183,49 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <VStack gap={6} align="stretch">
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        bg="bg.panel"
-        rounded="xl"
-        px={{ base: 4, md: 6 }}
-        py={{ base: 4, md: 5 }}
-        boxShadow="xs"
-      >
-        <HStack justify="space-between" align="center">
-          <Heading size="lg" color="fg">
-            Weekly Picks
-          </Heading>
-          <Text color="fg.muted" fontSize="sm">
-            {user.displayName || user.email}
-          </Text>
-        </HStack>
-      </Box>
+    <div className="max-w-5xl mx-auto">
+      <div className="flex items-center justify-between border-b bg-card p-4 mb-4">
+        <h2 className="text-2xl font-semibold">
+          Week {selectedWeek}
+        </h2>
+        {hasUnsavedChanges && (
+          <Button onClick={handleSavePicks} disabled={saving} className="font-semibold">
+            {saving && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+            Save Picks
+          </Button>
+        )}
+      </div>
 
       <LeaderboardCard />
 
-      {loading ? (
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          rounded="xl"
-          bg="bg.panel"
-          py={16}
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-        >
-          <VStack gap={4}>
-            <Spinner size="xl" colorPalette="blue" />
-            <Text color="fg.muted" fontSize="sm">Loading games...</Text>
-          </VStack>
-        </Box>
-      ) : (
-        <VStack gap={3} align="stretch">
-          {games.map((game) => (
-            <GamePickCard
-              key={game.eventId}
-              game={game}
-              selectedSide={picks[game.eventId]}
-              onPickChange={handlePickChange}
-              disabled={game.status.state === "post"}
-            />
-          ))}
-        </VStack>
-      )}
+      <div>
+        {games.map((game) => (
+          <GamePickCard
+            key={game.eventId}
+            game={game}
+            selectedSide={picks[game.eventId]}
+            onPickChange={handlePickChange}
+            disabled={game.status.state !== "pre"}
+          />
+        ))}
+      </div>
 
-      {hasUnsavedChanges && (
-        <Button
-          onClick={handleSavePicks}
-          loading={saving}
-          colorPalette="blue"
-          size="lg"
-          alignSelf="flex-end"
-        >
-          Save Picks
-        </Button>
+      {games.length === 0 && (
+        <div className="text-center py-16 border rounded-lg">
+          <p className="text-muted-foreground">
+            No games available for this week
+          </p>
+        </div>
       )}
-    </VStack>
+    </div>
   );
 }

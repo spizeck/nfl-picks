@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { User as FirebaseUser } from "firebase/auth";
-import { Box, Spinner } from "@chakra-ui/react";
+import { Loader2 } from "lucide-react";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { AuthLanding } from "@/components/auth/auth-landing";
 import { Dashboard } from "@/components/dashboard/dashboard";
@@ -36,14 +36,9 @@ export default function HomeClient() {
   if (!ready) {
     return (
       <AppShell>
-        <Box
-          minH="60vh"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Spinner size="xl" />
-        </Box>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin" />
+        </div>
       </AppShell>
     );
   }

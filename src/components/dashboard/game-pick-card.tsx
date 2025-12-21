@@ -1,7 +1,7 @@
 "use client";
 
-import { Box, Grid, VStack, Text, Image } from "@chakra-ui/react";
 import type { NormalizedGame } from "@/lib/espn-data";
+import { cn } from "@/lib/utils";
 
 interface GamePickCardProps {
   game: NormalizedGame;
@@ -29,153 +29,105 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled }: Gam
   };
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      rounded="lg"
-      overflow="hidden"
-      bg="bg.panel"
-    >
-      <Grid
-        templateColumns="1fr 1fr 1fr"
-        gap={0}
-        alignItems="stretch"
-        minH="100px"
-      >
+    <div className="border rounded-none border-b-0 last:border-b overflow-hidden bg-card hover:bg-muted/50 transition-colors">
+      <div className="grid grid-cols-3 items-stretch min-h-[120px]">
         {/* LEFT: Away Team */}
-        <Box
-          as="button"
+        <button
           onClick={handleAwayClick}
-          data-disabled={disabled}
-          cursor={disabled ? "not-allowed" : "pointer"}
-          p={4}
-          bg={isAwaySelected ? "blue.subtle" : "transparent"}
-          borderWidth={isAwaySelected ? "2px" : "0"}
-          borderColor={isAwaySelected ? "blue.solid" : "transparent"}
-          borderRightWidth="1px"
-          borderRightColor="border.muted"
-          transition="all 0.2s"
-          _hover={!disabled ? { bg: isAwaySelected ? "blue.subtle" : "bg.muted" } : {}}
-          _focus={{
-            outline: "2px solid",
-            outlineColor: "blue.solid",
-            outlineOffset: "-2px",
-          }}
+          disabled={disabled}
+          className={cn(
+            "p-4 border-r transition-all",
+            isAwaySelected ? "bg-muted border-l-4 border-l-foreground" : "bg-transparent",
+            disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted"
+          )}
           aria-pressed={isAwaySelected}
-          opacity={disabled ? 0.6 : 1}
         >
-          <VStack gap={2} align="center" justify="center" h="full">
-            <Image
+          <div className="flex flex-col items-center justify-center h-full gap-2">
+            <img
               src={game.away.logo}
               alt={game.away.name}
-              boxSize="40px"
-              objectFit="contain"
+              className="h-10 w-10 object-contain"
             />
-            <VStack gap={0.5} align="center">
-              <Text
-                fontSize="sm"
-                fontWeight={isAwaySelected ? "bold" : "medium"}
-                color="fg"
-                textAlign="center"
-                lineHeight="1.2"
-              >
+            <div className="flex flex-col items-center gap-0.5">
+              <p className={cn(
+                "text-sm text-center leading-tight",
+                isAwaySelected ? "font-bold" : "font-medium"
+              )}>
                 {game.away.name}
-              </Text>
+              </p>
               {game.away.record && (
-                <Text fontSize="xs" color="fg.muted">
+                <p className="text-xs text-muted-foreground">
                   {game.away.record}
-                </Text>
+                </p>
               )}
-            </VStack>
-          </VStack>
-        </Box>
+            </div>
+          </div>
+        </button>
 
         {/* CENTER: Status */}
-        <VStack
-          gap={1}
-          align="center"
-          justify="center"
-          px={4}
-          py={2}
-          bg="bg"
-        >
+        <div className="flex flex-col items-center justify-center px-4 py-2 gap-1 bg-background">
           {isGameFinal ? (
             <>
-              <Text fontSize="xs" color="fg.muted" fontWeight="medium">
+              <p className="text-xs text-muted-foreground font-medium">
                 Final
-              </Text>
+              </p>
               {game.status.detail && (
-                <Text fontSize="lg" fontWeight="bold" color="fg">
+                <p className="text-lg font-bold">
                   {game.status.detail}
-                </Text>
+                </p>
               )}
             </>
           ) : isGameLive ? (
             <>
-              <Text fontSize="lg" fontWeight="bold" color="fg">
+              <p className="text-lg font-bold">
                 {game.status.displayText}
-              </Text>
+              </p>
               {game.status.detail && (
-                <Text fontSize="xs" color="fg.muted">
+                <p className="text-xs text-muted-foreground">
                   {game.status.detail}
-                </Text>
+                </p>
               )}
             </>
           ) : (
-            <Text fontSize="xs" color="fg.muted" textAlign="center">
+            <p className="text-xs text-muted-foreground text-center">
               {game.status.displayText}
-            </Text>
+            </p>
           )}
-        </VStack>
+        </div>
 
         {/* RIGHT: Home Team */}
-        <Box
-          as="button"
+        <button
           onClick={handleHomeClick}
-          data-disabled={disabled}
-          cursor={disabled ? "not-allowed" : "pointer"}
-          p={4}
-          bg={isHomeSelected ? "blue.subtle" : "transparent"}
-          borderWidth={isHomeSelected ? "2px" : "0"}
-          borderColor={isHomeSelected ? "blue.solid" : "transparent"}
-          borderLeftWidth="1px"
-          borderLeftColor="border.muted"
-          transition="all 0.2s"
-          _hover={!disabled ? { bg: isHomeSelected ? "blue.subtle" : "bg.muted" } : {}}
-          _focus={{
-            outline: "2px solid",
-            outlineColor: "blue.solid",
-            outlineOffset: "-2px",
-          }}
+          disabled={disabled}
+          className={cn(
+            "p-4 border-l transition-all",
+            isHomeSelected ? "bg-muted border-l-4 border-l-foreground" : "bg-transparent",
+            disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted"
+          )}
           aria-pressed={isHomeSelected}
-          opacity={disabled ? 0.6 : 1}
         >
-          <VStack gap={2} align="center" justify="center" h="full">
-            <Image
+          <div className="flex flex-col items-center justify-center h-full gap-2">
+            <img
               src={game.home.logo}
               alt={game.home.name}
-              boxSize="40px"
-              objectFit="contain"
+              className="h-10 w-10 object-contain"
             />
-            <VStack gap={0.5} align="center">
-              <Text
-                fontSize="sm"
-                fontWeight={isHomeSelected ? "bold" : "medium"}
-                color="fg"
-                textAlign="center"
-                lineHeight="1.2"
-              >
+            <div className="flex flex-col items-center gap-0.5">
+              <p className={cn(
+                "text-sm text-center leading-tight",
+                isHomeSelected ? "font-bold" : "font-medium"
+              )}>
                 {game.home.name}
-              </Text>
+              </p>
               {game.home.record && (
-                <Text fontSize="xs" color="fg.muted">
+                <p className="text-xs text-muted-foreground">
                   {game.home.record}
-                </Text>
+                </p>
               )}
-            </VStack>
-          </VStack>
-        </Box>
-      </Grid>
-    </Box>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
   );
 }
