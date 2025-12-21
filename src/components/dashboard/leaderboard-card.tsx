@@ -23,7 +23,8 @@ export function LeaderboardCard() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [sortBy, setSortBy] = useState<"wins" | "percentage">("percentage");
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>("week");
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("season");
+  const [showAll, setShowAll] = useState(false);
 
   const fetchLeaderboard = async () => {
     const db = getFirestoreDb();
@@ -36,7 +37,16 @@ export function LeaderboardCard() {
 
       for (const userDoc of usersSnapshot.docs) {
         const userData = userDoc.data();
-        const stats = userData.stats?.[`season${currentYear}`] || { wins: 0, losses: 0 };
+        
+        // Get stats based on selected time period
+        let stats;
+        if (timePeriod === "allTime") {
+          stats = userData.stats?.allTime || { wins: 0, losses: 0, winPercentage: 0 };
+        } else {
+          // Both "week" and "season" use season stats for now
+          // TODO: Implement per-week stats in the future
+          stats = userData.stats?.[`season${currentYear}`] || { wins: 0, losses: 0, winPercentage: 0 };
+        }
 
         entries.push({
           uid: userDoc.id,
@@ -77,7 +87,8 @@ export function LeaderboardCard() {
 
   useEffect(() => {
     fetchLeaderboard();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timePeriod]);
 
   const sortedLeaderboard = [...leaderboard].sort((a, b) => {
     if (sortBy === "wins") {
@@ -85,6 +96,9 @@ export function LeaderboardCard() {
     }
     return b.winPercentage - a.winPercentage;
   });
+
+  // Limit to top 10 unless "Show All" is enabled
+  const displayedLeaderboard = showAll ? sortedLeaderboard : sortedLeaderboard.slice(0, 10);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -101,51 +115,133 @@ export function LeaderboardCard() {
               </div>
             </Button>
           </CollapsibleTrigger>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={updateStats}
-            disabled={updating}
-            className="text-xs mr-4"
-          >
-            {updating ? (
-              <>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                Updating...
-              </>
-            ) : (
-              "Update Stats"
-            )}
-          </Button>
+          <div className="flex gap-2 mr-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setUpdating(true);
+                try {
+                  const { getFirestoreDb, getFirebaseAuth } = await import("@/lib/firebase");
+                  const { collection, getDocs, doc, updateDoc } = await import("firebase/firestore");
+                  
+                  const db = getFirestoreDb();
+                  const auth = getFirebaseAuth();
+                  const user = auth?.currentUser;
+                  
+                  if (!db || !user) {
+                    alert("Please sign in to migrate picks");
+                    return;
+                  }
+
+                  // Fetch all games to get team IDs
+                  const gamesResponse = await fetch(`/api/nfl-games?week=16&year=2025`);
+                  const rawGames = await gamesResponse.json();
+                  
+                  const { normalizeESPNGame } = await import("@/lib/espn-data");
+                  const gameMap = new Map();
+                  rawGames.forEach((event: Record<string, unknown>) => {
+                    try {
+                      const game = normalizeESPNGame(event as never);
+                      gameMap.set(game.eventId, game);
+                    } catch (err) {
+                      console.error("Error normalizing:", err);
+                    }
+                  });
+
+                  // Get user's picks
+                  const picksRef = collection(db, "users", user.uid, "picks");
+                  const picksSnapshot = await getDocs(picksRef);
+                  
+                  let migrated = 0;
+                  const updates: Promise<void>[] = [];
+
+                  picksSnapshot.forEach((pickDoc) => {
+                    const pick = pickDoc.data();
+                    const game = gameMap.get(pick.gameId);
+                    
+                    if (game && (pick.selectedTeam === "home" || pick.selectedTeam === "away")) {
+                      const newTeamId = pick.selectedTeam === "home" ? game.home.id : game.away.id;
+                      const pickRef = doc(db, "users", user.uid, "picks", pickDoc.id);
+                      updates.push(updateDoc(pickRef, {
+                        selectedTeam: newTeamId,
+                        migratedAt: new Date()
+                      }));
+                      migrated++;
+                    }
+                  });
+
+                  await Promise.all(updates);
+                  alert(`Migration complete! ${migrated} picks updated to team IDs.`);
+                } catch (error) {
+                  console.error("Migration error:", error);
+                  alert("Migration failed. Check console for details.");
+                } finally {
+                  setUpdating(false);
+                }
+              }}
+              disabled={updating}
+              className="text-xs"
+            >
+              {updating ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Migrating...
+                </>
+              ) : (
+                "Migrate My Picks"
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={updateStats}
+              disabled={updating}
+              className="text-xs"
+            >
+              {updating ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Update Stats"
+              )}
+            </Button>
+          </div>
         </div>
 
         <CollapsibleContent>
           <div className="p-4 space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant={timePeriod === "week" ? "default" : "outline"}
-                onClick={() => setTimePeriod("week")}
-                className="font-semibold"
-              >
-                Week
-              </Button>
-              <Button
-                size="sm"
-                variant={timePeriod === "season" ? "default" : "outline"}
-                onClick={() => setTimePeriod("season")}
-                className="font-semibold"
-              >
-                Season
-              </Button>
-              <Button
-                size="sm"
-                variant={timePeriod === "allTime" ? "default" : "outline"}
-                onClick={() => setTimePeriod("allTime")}
-                className="font-semibold"
-              >
-                All Time
-              </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant={timePeriod === "season" ? "default" : "outline"}
+                  onClick={() => setTimePeriod("season")}
+                  className="font-semibold"
+                >
+                  Season
+                </Button>
+                <Button
+                  size="sm"
+                  variant={timePeriod === "allTime" ? "default" : "outline"}
+                  onClick={() => setTimePeriod("allTime")}
+                  className="font-semibold"
+                >
+                  All Time
+                </Button>
+              </div>
+              {sortedLeaderboard.length > 10 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowAll(!showAll)}
+                  className="font-semibold text-xs"
+                >
+                  {showAll ? "Show Top 10" : `Show All (${sortedLeaderboard.length})`}
+                </Button>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -173,7 +269,7 @@ export function LeaderboardCard() {
               </div>
             ) : (
               <div className="space-y-2">
-                {sortedLeaderboard.map((entry, index) => (
+                {displayedLeaderboard.map((entry, index) => (
                   <div
                     key={entry.uid}
                     className="flex items-center justify-between p-3 hover:bg-muted transition-colors border-b last:border-b-0"
@@ -199,7 +295,7 @@ export function LeaderboardCard() {
                     </div>
                   </div>
                 ))}
-                {sortedLeaderboard.length === 0 && (
+                {displayedLeaderboard.length === 0 && (
                   <p className="text-center text-muted-foreground py-4">
                     No leaderboard data available
                   </p>

@@ -78,20 +78,25 @@ export async function POST() {
           const homeScore = game.home.score ?? 0;
           const awayScore = game.away.score ?? 0;
 
-          let winningSide: "away" | "home" | null = null;
+          // Determine winning team ID
+          let winningTeamId: string | null = null;
           if (homeScore > awayScore) {
-            winningSide = "home";
+            winningTeamId = game.home.id;
           } else if (awayScore > homeScore) {
-            winningSide = "away";
+            winningTeamId = game.away.id;
           }
 
-          if (winningSide) {
-            const userPickedCorrectly =
-              pick.selectedTeam === winningSide ||
-              pick.selectedTeam ===
-                (winningSide === "home" ? game.home.id : game.away.id);
+          if (winningTeamId) {
+            // Normalize pick.selectedTeam to team ID if it's "home" or "away"
+            let userPickedTeamId = pick.selectedTeam;
+            if (pick.selectedTeam === "home") {
+              userPickedTeamId = game.home.id;
+            } else if (pick.selectedTeam === "away") {
+              userPickedTeamId = game.away.id;
+            }
 
-            if (userPickedCorrectly) {
+            // Simple team ID comparison
+            if (userPickedTeamId === winningTeamId) {
               seasonWins++;
             } else {
               seasonLosses++;
