@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { getFirebaseAuth, getGoogleProvider } from "@/lib/firebase";
-import { Button, Text, Box, Avatar } from "@chakra-ui/react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { User as FirebaseUser } from "firebase/auth";
+import { Loader2 } from "lucide-react";
 
 interface User {
   uid: string;
@@ -17,7 +19,6 @@ export function SignIn() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Check if user is already signed in
   useEffect(() => {
     const auth = getFirebaseAuth();
     if (!auth) return;
@@ -35,7 +36,6 @@ export function SignIn() {
       }
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
 
@@ -80,26 +80,26 @@ export function SignIn() {
 
   if (user) {
     return (
-      <Box display="flex" alignItems="center" gap={4}>
-        <Avatar.Root size="sm">
-          {user.photoURL ? <Avatar.Image src={user.photoURL} /> : null}
-          <Avatar.Fallback name={user.displayName || user.email || "User"} />
-        </Avatar.Root>
-        <Text>{user.displayName || user.email}</Text>
-        <Button onClick={handleSignOut} colorPalette="red" variant="outline">
+      <div className="flex items-center gap-4">
+        <Avatar className="h-8 w-8">
+          {user.photoURL && <AvatarImage src={user.photoURL} />}
+          <AvatarFallback>{user.displayName?.[0] || user.email?.[0] || "U"}</AvatarFallback>
+        </Avatar>
+        <span className="text-sm">{user.displayName || user.email}</span>
+        <Button onClick={handleSignOut} variant="outline" size="sm">
           Sign Out
         </Button>
-      </Box>
+      </div>
     );
   }
 
   return (
     <Button
       onClick={handleGoogleSignIn}
-      loading={loading}
-      colorPalette="blue"
+      disabled={loading}
       size="lg"
     >
+      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
       Sign in with Google
     </Button>
   );

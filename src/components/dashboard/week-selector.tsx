@@ -1,6 +1,6 @@
 "use client";
 
-import { HStack, Button, Text } from "@chakra-ui/react";
+import { Button } from "@/components/ui/button";
 
 interface WeekSelectorProps {
   selectedWeek: number | null;
@@ -11,24 +11,21 @@ export function WeekSelector({ selectedWeek, onWeekChange }: WeekSelectorProps) 
   const weeks = Array.from({ length: 18 }, (_, i) => i + 1);
 
   return (
-    <HStack gap={2} overflowX="auto" py={2}>
+    <div className="flex gap-2 overflow-x-auto py-2">
       {weeks.map((week) => {
         const isSelected = selectedWeek === week;
         return (
           <Button
             key={week}
             onClick={() => onWeekChange(week)}
-            variant={isSelected ? "solid" : "outline"}
-            colorPalette="blue"
+            variant={isSelected ? "default" : "outline"}
             size="sm"
-            minW="60px"
-            borderWidth={isSelected ? "2px" : "1px"}
-            fontWeight={isSelected ? "bold" : "medium"}
+            className={`min-w-[60px] ${isSelected ? 'font-bold' : 'font-medium'}`}
           >
-            <Text fontSize="sm">Week {week}</Text>
+            Week {week}
           </Button>
         );
       })}
-    </HStack>
+    </div>
   );
 }

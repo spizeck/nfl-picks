@@ -1,21 +1,11 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
-import {
-  Box,
-  Button,
-  Container,
-  Flex,
-  HStack,
-  Heading,
-  IconButton,
-  Spacer,
-  Text,
-} from "@chakra-ui/react"
 import type { User as FirebaseUser } from "firebase/auth"
 import { signOut } from "firebase/auth"
-
-import { ColorModeIcon, useColorMode } from "@/components/ui/color-mode"
+import { Button } from "@/components/ui/button"
+import { Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
 import { getFirebaseAuth } from "@/lib/firebase"
 import { WeekDropdown } from "./week-dropdown"
 
@@ -28,25 +18,20 @@ interface AppShellProps {
 
 export function AppShell({ children, user, selectedWeek, onWeekChange }: AppShellProps) {
   return (
-    <Box bg="bg" color="fg" minH="100vh">
-      <Container
-        maxW="6xl"
-        minH="100vh"
-        px={{ base: 4, md: 6 }}
-        py={{ base: 4, md: 8 }}
-      >
-        <Flex direction="column" gap={6} minH="100%">
+    <div className="min-h-screen bg-background">
+      <div className="container max-w-7xl mx-auto min-h-screen px-4 md:px-8 lg:px-12 py-6 md:py-8">
+        <div className="flex flex-col gap-8 min-h-full">
           <AppHeader 
             user={user ?? null} 
             selectedWeek={selectedWeek}
             onWeekChange={onWeekChange}
           />
-          <Box as="main" flex="1">
+          <main className="flex-1 pb-8">
             {children}
-          </Box>
-        </Flex>
-      </Container>
-    </Box>
+          </main>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -57,7 +42,7 @@ interface AppHeaderProps {
 }
 
 function AppHeader({ user, selectedWeek, onWeekChange }: AppHeaderProps) {
-  const { toggleColorMode } = useColorMode()
+  const { theme, setTheme } = useTheme()
   const [signingOut, setSigningOut] = useState(false)
 
   const handleLogout = async () => {
@@ -74,64 +59,53 @@ function AppHeader({ user, selectedWeek, onWeekChange }: AppHeaderProps) {
     }
   }
 
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark")
+  }
+
   return (
-    <Flex
-      align="center"
-      gap={{ base: 3, md: 4 }}
-      borderWidth="1px"
-      borderColor="border.muted"
-      rounded="xl"
-      bg="bg.panel"
-      px={{ base: 4, md: 6 }}
-      py={{ base: 3, md: 4 }}
-      boxShadow="sm"
-    >
-      <HStack gap={3}>
-        <Box
-          w="10"
-          h="10"
-          rounded="full"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          bg="blue.subtle"
-        >
-          <Text fontSize="xl">🏈</Text>
-        </Box>
-        <Heading size="lg">NFL Picks</Heading>
-      </HStack>
+    <div className="flex items-center gap-3 md:gap-4 border-b bg-card px-4 md:px-6 py-3">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-muted border">
+          <span className="text-xl">🏈</span>
+        </div>
+        <h1 className="text-xl md:text-2xl font-semibold">
+          NFL Picks
+        </h1>
+      </div>
 
-      <Spacer />
+      <div className="flex-1" />
 
-      <HStack gap={2}>
+      <div className="flex items-center gap-2 md:gap-3">
         {user && selectedWeek !== undefined && onWeekChange && (
           <WeekDropdown selectedWeek={selectedWeek} onWeekChange={onWeekChange} />
         )}
         {user && (
-          <Text color="fg.muted" fontSize="sm" display={{ base: "none", md: "block" }}>
+          <span className="text-sm text-muted-foreground px-2 py-1">
             {user.displayName || user.email}
-          </Text>
+          </span>
         )}
-        <IconButton
-          aria-label="Toggle color mode"
+        <Button
           variant="ghost"
-          size="sm"
-          onClick={toggleColorMode}
+          size="icon"
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
+          className="hover:bg-muted/50"
         >
-          <ColorModeIcon />
-        </IconButton>
+          {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
         {user && (
           <Button
             size="sm"
-            variant="solid"
-            colorPalette="blue"
             onClick={handleLogout}
-            loading={signingOut}
+            disabled={signingOut}
+            variant="outline"
+            className="font-semibold"
           >
             Logout
           </Button>
         )}
-      </HStack>
-    </Flex>
+      </div>
+    </div>
   )
 }
