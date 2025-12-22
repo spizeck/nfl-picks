@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { getFirestoreDb } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 
 interface LeaderboardEntry {
   uid: string;
@@ -64,27 +65,8 @@ export function LeaderboardCard() {
     }
   };
 
-  const updateStats = async () => {
-    try {
-      const response = await fetch("/api/update-stats", { method: "POST" });
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log(`Updated stats for ${result.usersUpdated} users based on ${result.completedGames} completed games`);
-      } else {
-        console.error("Failed to update stats:", result.error);
-      }
-    } catch (error) {
-      console.error("Error updating stats:", error);
-    }
-  };
-
   useEffect(() => {
-    const loadData = async () => {
-      await updateStats();
-      await fetchLeaderboard();
-    };
-    loadData();
+    fetchLeaderboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timePeriod]);
 
