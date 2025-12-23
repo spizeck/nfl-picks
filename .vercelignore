@@ -1,0 +1,9 @@
+# Firebase - deployed separately to Google Cloud
+functions/
+firebase.json
+.firebaserc
+firestore.rules
+firestore.indexes.json
+
+# Firebase cache and config
+.firebase/

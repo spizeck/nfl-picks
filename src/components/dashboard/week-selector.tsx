@@ -7,7 +7,10 @@ interface WeekSelectorProps {
   onWeekChange: (week: number) => void;
 }
 
-export function WeekSelector({ selectedWeek, onWeekChange }: WeekSelectorProps) {
+export function WeekSelector({
+  selectedWeek,
+  onWeekChange,
+}: WeekSelectorProps) {
   const weeks = Array.from({ length: 18 }, (_, i) => i + 1);
 
   return (
@@ -20,7 +23,7 @@ export function WeekSelector({ selectedWeek, onWeekChange }: WeekSelectorProps) 
             onClick={() => onWeekChange(week)}
             variant={isSelected ? "default" : "outline"}
             size="sm"
-            className={`min-w-60px ${isSelected ? 'font-bold' : 'font-medium'}`}
+            className={`min-w-60px ${isSelected ? "font-bold" : "font-medium"}`}
           >
             Week {week}
           </Button>

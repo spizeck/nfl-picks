@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { getFirestoreDb } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
-import { auth } from "@/lib/firebase";
 
 interface LeaderboardEntry {
   uid: string;
@@ -37,15 +40,23 @@ export function LeaderboardCard() {
 
       for (const userDoc of usersSnapshot.docs) {
         const userData = userDoc.data();
-        
+
         // Get stats based on selected time period
         let stats;
         if (timePeriod === "allTime") {
-          stats = userData.stats?.allTime || { wins: 0, losses: 0, winPercentage: 0 };
+          stats = userData.stats?.allTime || {
+            wins: 0,
+            losses: 0,
+            winPercentage: 0,
+          };
         } else {
           // Both "week" and "season" use season stats for now
           // TODO: Implement per-week stats in the future
-          stats = userData.stats?.[`season${currentYear}`] || { wins: 0, losses: 0, winPercentage: 0 };
+          stats = userData.stats?.[`season${currentYear}`] || {
+            wins: 0,
+            losses: 0,
+            winPercentage: 0,
+          };
         }
 
         entries.push({
@@ -78,7 +89,9 @@ export function LeaderboardCard() {
   });
 
   // Limit to top 10 unless "Show All" is enabled
-  const displayedLeaderboard = showAll ? sortedLeaderboard : sortedLeaderboard.slice(0, 10);
+  const displayedLeaderboard = showAll
+    ? sortedLeaderboard
+    : sortedLeaderboard.slice(0, 10);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -90,8 +103,14 @@ export function LeaderboardCard() {
               className="flex-1 flex items-center justify-start p-4 hover:bg-muted"
             >
               <div className="flex items-center gap-2">
-                {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                <h2 className="text-lg font-semibold text-foreground">Leaderboard</h2>
+                {open ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                <h2 className="text-lg font-semibold text-foreground">
+                  Leaderboard
+                </h2>
               </div>
             </Button>
           </CollapsibleTrigger>
@@ -125,7 +144,9 @@ export function LeaderboardCard() {
                   onClick={() => setShowAll(!showAll)}
                   className="font-semibold text-xs"
                 >
-                  {showAll ? "Show Top 10" : `Show All (${sortedLeaderboard.length})`}
+                  {showAll
+                    ? "Show Top 10"
+                    : `Show All (${sortedLeaderboard.length})`}
                 </Button>
               )}
             </div>
@@ -161,15 +182,22 @@ export function LeaderboardCard() {
                     className="flex items-center justify-between p-3 hover:bg-muted transition-colors border-b last:border-b-0"
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
-                        index === 0 ? 'bg-yellow-500 text-yellow-950' :
-                        index === 1 ? 'bg-gray-400 text-gray-950' :
-                        index === 2 ? 'bg-orange-600 text-orange-950' :
-                        'bg-muted text-muted-foreground'
-                      }`}>
+                      <div
+                        className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+                          index === 0
+                            ? "bg-yellow-500 text-yellow-950"
+                            : index === 1
+                            ? "bg-gray-400 text-gray-950"
+                            : index === 2
+                            ? "bg-orange-600 text-orange-950"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
                         {index + 1}
                       </div>
-                      <span className="font-semibold text-base">{entry.displayName}</span>
+                      <span className="font-semibold text-base">
+                        {entry.displayName}
+                      </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
                       <span className="text-muted-foreground font-medium">

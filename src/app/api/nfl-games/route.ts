@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
+import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
 
 // ESPN API endpoint for NFL scores and schedule
 const ESPN_API_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
@@ -47,13 +48,52 @@ export async function GET(request: NextRequest) {
     // Return raw ESPN events data
     const events = data.events || [];
     
+    // Normalize the events for individual game documents
+    const normalizedGames: (NormalizedGame & { week: number; year: number })[] = [];
+    const weekNumber = week ? parseInt(week, 10) : 0;
+    const yearNumber = parseInt(year, 10);
+    
+    for (const event of events) {
+      try {
+        const normalized = normalizeESPNGame(event);
+        normalizedGames.push({
+          ...normalized,
+          week: weekNumber,
+          year: yearNumber,
+        });
+      } catch (error) {
+        console.error(`Error normalizing event ${event.id}:`, error);
+        // Continue processing other events even if one fails
+      }
+    }
+    
     // Cache the data in Firestore if available
     if (adminDb) {
       const cacheKey = `nfl-games-${year}-${week || "current"}`;
-      await adminDb.collection("cache").doc(cacheKey).set({
+      
+      // Use batch write for atomic updates
+      const batch = adminDb.batch();
+      
+      // Update cache document (for backward compatibility)
+      const cacheRef = adminDb.collection("cache").doc(cacheKey);
+      batch.set(cacheRef, {
         events,
         timestamp: Timestamp.now(),
       });
+      
+      // Write each game to individual documents
+      for (const game of normalizedGames) {
+        const gameRef = adminDb.collection("games").doc(game.eventId);
+        batch.set(gameRef, {
+          ...game,
+          lastUpdated: Timestamp.now(),
+        }, { merge: true });
+      }
+      
+      // Commit all writes atomically
+      await batch.commit();
+      
+      console.log(`Cached ${events.length} events and ${normalizedGames.length} individual games for week ${week}, year ${year}`);
     }
     
     return NextResponse.json(events);

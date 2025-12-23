@@ -1,4 +1,4 @@
-import { getAdminDb } from "../src/lib/firebase-admin";
+import { getAdminDb } from "../../src/lib/firebase-admin";
 
 async function forceStatsUpdate() {
   const adminDb = getAdminDb();

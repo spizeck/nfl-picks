@@ -21,7 +21,13 @@ interface GamePickCardProps {
   userPicks?: UserPickInfo[];
 }
 
-export function GamePickCard({ game, selectedSide, onPickChange, disabled, userPicks = [] }: GamePickCardProps) {
+export function GamePickCard({
+  game,
+  selectedSide,
+  onPickChange,
+  disabled,
+  userPicks = [],
+}: GamePickCardProps) {
   const isAwaySelected = selectedSide === "away";
   const isHomeSelected = selectedSide === "home";
   const isGameLive = game.status.state === "in";
@@ -29,25 +35,40 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
   const isGameLocked = isGameLive || isGameFinal;
 
   // Filter picks by team for locked games
-  const awayPicks = isGameLocked ? userPicks.filter(p => p.selectedTeam === game.away.id) : [];
-  const homePicks = isGameLocked ? userPicks.filter(p => p.selectedTeam === game.home.id) : [];
+  const awayPicks = isGameLocked
+    ? userPicks.filter((p) => p.selectedTeam === game.away.id)
+    : [];
+  const homePicks = isGameLocked
+    ? userPicks.filter((p) => p.selectedTeam === game.home.id)
+    : [];
 
   // Determine if user picked correctly (only for final games)
   let userPickedCorrectly: boolean | null = null;
-  if (isGameFinal && selectedSide && game.away.score !== undefined && game.home.score !== undefined) {
+  if (
+    isGameFinal &&
+    selectedSide &&
+    game.away.score !== undefined &&
+    game.home.score !== undefined
+  ) {
     // Convert scores to numbers for proper comparison
     const awayScore = Number(game.away.score);
     const homeScore = Number(game.home.score);
-    
+
     // Determine which team won based on scores
-    const winningTeamId = awayScore > homeScore ? game.away.id : 
-                         homeScore > awayScore ? game.home.id : null;
-    
+    const winningTeamId =
+      awayScore > homeScore
+        ? game.away.id
+        : homeScore > awayScore
+        ? game.home.id
+        : null;
+
     // Get the team ID the user selected
-    const userSelectedTeamId = selectedSide === "away" ? game.away.id : game.home.id;
-    
+    const userSelectedTeamId =
+      selectedSide === "away" ? game.away.id : game.home.id;
+
     // User picked correctly if their selected team won
-    userPickedCorrectly = winningTeamId !== null && userSelectedTeamId === winningTeamId;
+    userPickedCorrectly =
+      winningTeamId !== null && userSelectedTeamId === winningTeamId;
   }
 
   const handleAwayClick = () => {
@@ -71,8 +92,12 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
           disabled={disabled}
           className={cn(
             "p-4 border-r transition-all",
-            isAwaySelected ? "bg-muted border-l-4 border-l-foreground" : "bg-transparent",
-            disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted"
+            isAwaySelected
+              ? "bg-muted border-l-4 border-l-foreground"
+              : "bg-transparent",
+            disabled
+              ? "cursor-not-allowed opacity-60"
+              : "cursor-pointer hover:bg-muted"
           )}
           aria-pressed={isAwaySelected}
         >
@@ -85,10 +110,14 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
               className="h-10 w-10 object-contain"
             />
             <div className="flex flex-col items-center gap-0.5">
-              <p className={cn(
-                "text-sm text-center leading-tight",
-                isAwaySelected ? "font-bold text-foreground" : "font-medium text-muted-foreground"
-              )}>
+              <p
+                className={cn(
+                  "text-sm text-center leading-tight",
+                  isAwaySelected
+                    ? "font-bold text-foreground"
+                    : "font-medium text-muted-foreground"
+                )}
+              >
                 {game.away.name}
               </p>
               {game.away.record && (
@@ -100,7 +129,10 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
             {isGameLocked && awayPicks.length > 0 && (
               <div className="flex gap-1 mt-1">
                 {awayPicks.map((pick) => (
-                  <Avatar key={pick.userId} className="h-6 w-6 border-2 border-background">
+                  <Avatar
+                    key={pick.userId}
+                    className="h-6 w-6 border-2 border-background"
+                  >
                     <AvatarImage src={pick.photoURL} alt={pick.displayName} />
                     <AvatarFallback className="text-xs">
                       {pick.displayName.charAt(0).toUpperCase()}
@@ -125,20 +157,14 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
                   )}
                 </div>
               )}
-              <p className="text-xs text-muted-foreground font-medium">
-                Final
-              </p>
+              <p className="text-xs text-muted-foreground font-medium">Final</p>
               {game.status.detail && (
-                <p className="text-lg font-bold">
-                  {game.status.detail}
-                </p>
+                <p className="text-lg font-bold">{game.status.detail}</p>
               )}
             </>
           ) : isGameLive ? (
             <>
-              <p className="text-lg font-bold">
-                {game.status.displayText}
-              </p>
+              <p className="text-lg font-bold">{game.status.displayText}</p>
               {game.status.detail && (
                 <p className="text-xs text-muted-foreground">
                   {game.status.detail}
@@ -158,8 +184,12 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
           disabled={disabled}
           className={cn(
             "p-4 border-l transition-all",
-            isHomeSelected ? "bg-muted border-l-4 border-l-foreground" : "bg-transparent",
-            disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted"
+            isHomeSelected
+              ? "bg-muted border-l-4 border-l-foreground"
+              : "bg-transparent",
+            disabled
+              ? "cursor-not-allowed opacity-60"
+              : "cursor-pointer hover:bg-muted"
           )}
           aria-pressed={isHomeSelected}
         >
@@ -172,10 +202,14 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
               className="h-10 w-10 object-contain"
             />
             <div className="flex flex-col items-center gap-0.5">
-              <p className={cn(
-                "text-sm text-center leading-tight",
-                isHomeSelected ? "font-bold text-foreground" : "font-medium text-muted-foreground"
-              )}>
+              <p
+                className={cn(
+                  "text-sm text-center leading-tight",
+                  isHomeSelected
+                    ? "font-bold text-foreground"
+                    : "font-medium text-muted-foreground"
+                )}
+              >
                 {game.home.name}
               </p>
               {game.home.record && (
@@ -187,7 +221,10 @@ export function GamePickCard({ game, selectedSide, onPickChange, disabled, userP
             {isGameLocked && homePicks.length > 0 && (
               <div className="flex gap-1 mt-1">
                 {homePicks.map((pick) => (
-                  <Avatar key={pick.userId} className="h-6 w-6 border-2 border-background">
+                  <Avatar
+                    key={pick.userId}
+                    className="h-6 w-6 border-2 border-background"
+                  >
                     <AvatarImage src={pick.photoURL} alt={pick.displayName} />
                     <AvatarFallback className="text-xs">
                       {pick.displayName.charAt(0).toUpperCase()}

@@ -1,114 +1,143 @@
-import * as functions from "firebase-functions";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
-import type { NormalizedGame } from "../../src/lib/espn-data";
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+interface GameData {
+  eventId: string;
+  away: {
+    id: string;
+    score?: number;
+  };
+  home: {
+    id: string;
+    score?: number;
+  };
+  status: {
+    state: "pre" | "in" | "post";
+  };
+}
+
 /**
- * Scheduled function that runs every hour to update user stats
- * Triggered by Cloud Scheduler
+ * Triggered whenever a game document is updated
+ * Only processes stats when a game changes from non-final to final
  */
-export const scheduledStatsUpdate = functions.pubsub
-  .schedule("0 * * * *") // Run every hour at minute 0
-  .timeZone("America/New_York")
-  .onRun(async (context) => {
+export const onGameComplete = onDocumentUpdated(
+  "games/{gameId}",
+  async (event) => {
+    const gameId = event.params.gameId;
+    const beforeData = event.data?.before.data() as GameData;
+    const afterData = event.data?.after.data() as GameData;
+
+    // Only process if game just became final
+    if (
+      beforeData.status.state === "post" ||
+      afterData.status.state !== "post"
+    ) {
+      console.log(`Game ${gameId} status unchanged or not final, skipping`);
+      return;
+    }
+
+    console.log(`Game ${gameId} just completed, updating affected users`);
+
     const db = admin.firestore();
     const currentYear = new Date().getFullYear();
 
-    console.log(`Starting scheduled stats update for ${currentYear}`);
-
     try {
-      // Fetch all completed games from ESPN API
-      const allCompletedGames: NormalizedGame[] = [];
-      
-      for (let week = 1; week <= 18; week++) {
-        try {
-          const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${currentYear}&seasontype=2&week=${week}`;
-          const response = await fetch(espnUrl);
-          const data = await response.json();
+      // Determine the winner
+      const homeScore = Number(afterData.home.score ?? 0);
+      const awayScore = Number(afterData.away.score ?? 0);
 
-          if (data.events) {
-            const { normalizeESPNGame } = await import("../../src/lib/espn-data");
-            
-            for (const event of data.events) {
-              try {
-                const game = normalizeESPNGame(event);
-                if (game.status.state === "post") {
-                  allCompletedGames.push(game);
-                }
-              } catch (err) {
-                console.error(`Error normalizing event ${event.id}:`, err);
-              }
-            }
-          }
-        } catch (err) {
-          console.error(`Error fetching week ${week}:`, err);
-        }
+      let winningTeamId: string | null = null;
+      if (homeScore > awayScore) {
+        winningTeamId = afterData.home.id;
+      } else if (awayScore > homeScore) {
+        winningTeamId = afterData.away.id;
       }
 
-      console.log(`Found ${allCompletedGames.length} completed games`);
+      if (!winningTeamId) {
+        console.log(`Game ${gameId} ended in a tie, no winner to process`);
+        return;
+      }
 
-      // Get all users
-      const usersSnapshot = await db.collection("users").get();
+      // Find all users who picked this game using collectionGroup query
+      const picksSnapshot = await db
+        .collectionGroup("picks")
+        .where("gameId", "==", gameId)
+        .get();
+
+      console.log(`Found ${picksSnapshot.size} picks for game ${gameId}`);
+
+      // Process each user's pick
       const batch = db.batch();
-      let updatedCount = 0;
+      const usersToUpdate = new Set<string>();
 
-      for (const userDoc of usersSnapshot.docs) {
-        const userId = userDoc.id;
+      for (const pickDoc of picksSnapshot.docs) {
+        const pick = pickDoc.data();
 
-        // Get user's picks
-        const picksSnapshot = await db
+        // Extract userId from the document path
+        // Path format: users/{userId}/picks/{pickId}
+        const userId = pickDoc.ref.parent.parent?.id;
+        if (!userId) {
+          console.error(
+            `Could not extract userId from pick path: ${pickDoc.ref.path}`
+          );
+          continue;
+        }
+
+        // Normalize pick to team ID
+        let userPickedTeamId = pick.selectedTeam;
+        if (pick.selectedTeam === "home") {
+          userPickedTeamId = afterData.home.id;
+        } else if (pick.selectedTeam === "away") {
+          userPickedTeamId = afterData.away.id;
+        }
+
+        // Determine if user won this pick
+        const didWin = userPickedTeamId === winningTeamId;
+
+        // Update the pick document with result
+        batch.update(pickDoc.ref, {
+          result: didWin ? "win" : "loss",
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        usersToUpdate.add(userId);
+      }
+
+      // Commit pick updates
+      await batch.commit();
+
+      // Recalculate stats for affected users
+      const statsBatch = db.batch();
+
+      for (const userId of usersToUpdate) {
+        // Get all processed picks for this user
+        const userPicksSnapshot = await db
           .collection("users")
           .doc(userId)
           .collection("picks")
+          .where("result", "in", ["win", "loss"])
           .get();
 
         let seasonWins = 0;
         let seasonLosses = 0;
 
-        // Calculate wins/losses
-        for (const pickDoc of picksSnapshot.docs) {
+        for (const pickDoc of userPicksSnapshot.docs) {
           const pick = pickDoc.data();
-          const game = allCompletedGames.find((g) => g.eventId === pick.gameId);
-
-          if (game) {
-            // Convert scores to numbers for proper comparison
-            const homeScore = Number(game.home.score ?? 0);
-            const awayScore = Number(game.away.score ?? 0);
-
-            // Determine winning team ID
-            let winningTeamId: string | null = null;
-            if (homeScore > awayScore) {
-              winningTeamId = game.home.id;
-            } else if (awayScore > homeScore) {
-              winningTeamId = game.away.id;
-            }
-
-            if (winningTeamId) {
-              // Normalize pick to team ID
-              let userPickedTeamId = pick.selectedTeam;
-              if (pick.selectedTeam === "home") {
-                userPickedTeamId = game.home.id;
-              } else if (pick.selectedTeam === "away") {
-                userPickedTeamId = game.away.id;
-              }
-
-              // Compare team IDs
-              if (userPickedTeamId === winningTeamId) {
-                seasonWins++;
-              } else {
-                seasonLosses++;
-              }
-            }
+          if (pick.result === "win") {
+            seasonWins++;
+          } else if (pick.result === "loss") {
+            seasonLosses++;
           }
         }
 
-        // Update user stats using batch
+        // Update user stats
         const userRef = db.collection("users").doc(userId);
-        batch.set(
+        statsBatch.set(
           userRef,
           {
             stats: {
@@ -133,16 +162,16 @@ export const scheduledStatsUpdate = functions.pubsub
           },
           { merge: true }
         );
-        updatedCount++;
       }
 
-      // Commit all updates
-      await batch.commit();
+      await statsBatch.commit();
 
-      console.log(`Successfully updated stats for ${updatedCount} users`);
-      return null;
+      console.log(
+        `Successfully updated ${usersToUpdate.size} users for completed game ${gameId}`
+      );
     } catch (error) {
-      console.error("Error in scheduled stats update:", error);
+      console.error(`Error processing game completion for ${gameId}:`, error);
       throw error;
     }
-  });
+  }
+);

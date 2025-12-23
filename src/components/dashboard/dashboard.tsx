@@ -7,7 +7,7 @@ import { LeaderboardCard } from "./leaderboard-card";
 import { GamePickCard } from "./game-pick-card";
 import { WeekDropdown } from "../layout/week-dropdown";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
+import { type NormalizedGame } from "@/lib/espn-data";
 import type { User as FirebaseUser } from "firebase/auth";
 
 interface UserPick {
@@ -29,12 +29,14 @@ interface DashboardProps {
   onWeekChange: (week: number) => void;
 }
 
-export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) {
+export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
   const [currentYear] = useState(new Date().getFullYear());
   const [games, setGames] = useState<NormalizedGame[]>([]);
   const [picks, setPicks] = useState<Record<string, "away" | "home">>({});
   const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});
-  const [allUsersPicks, setAllUsersPicks] = useState<Record<string, UserPickInfo[]>>({});
+  const [allUsersPicks, setAllUsersPicks] = useState<
+    Record<string, UserPickInfo[]>
+  >({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -42,26 +44,19 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
   useEffect(() => {
     const fetchCurrentWeek = async () => {
       try {
-        const response = await fetch(`/api/nfl-games?year=${currentYear}`);
+        const response = await fetch(`/api/games?year=${currentYear}`);
         if (response.ok) {
           const rawEvents = await response.json();
           if (rawEvents.length > 0) {
-            const normalized = (rawEvents as Array<Record<string, unknown>>)
-              .map((event) => {
-                try {
-                  return normalizeESPNGame(event as never);
-                } catch (err) {
-                  console.error("Error normalizing event:", err);
-                  return null;
-                }
-              })
-              .filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
-            
+            // The games API returns normalized data directly
+            const normalized = rawEvents;
+
             setGames(normalized);
-            const firstGameDate = new Date(rawEvents[0].date);
+            const firstGameDate = new Date(normalized[0].date);
             const seasonStart = new Date(currentYear, 8, 1);
             const weeksSinceStart = Math.floor(
-              (firstGameDate.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
+              (firstGameDate.getTime() - seasonStart.getTime()) /
+                (7 * 24 * 60 * 60 * 1000)
             );
             const currentWeek = Math.max(1, Math.min(18, weeksSinceStart + 1));
             if (selectedWeek === null) {
@@ -92,19 +87,13 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     const fetchGames = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/nfl-games?week=${selectedWeek}&year=${currentYear}`);
+        const response = await fetch(
+          `/api/games?week=${selectedWeek}&year=${currentYear}`
+        );
         if (response.ok) {
           const rawEvents = await response.json();
-          const normalized = (rawEvents as Array<Record<string, unknown>>)
-            .map((event) => {
-              try {
-                return normalizeESPNGame(event as never);
-              } catch (err) {
-                console.error("Error normalizing event:", err);
-                return null;
-              }
-            })
-            .filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
+          // The games API returns normalized data directly
+          const normalized = rawEvents;
           setGames(normalized);
         }
       } catch (error) {
@@ -116,7 +105,9 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
 
     const fetchAllPicks = async () => {
       try {
-        const response = await fetch(`/api/all-picks?week=${selectedWeek}&year=${currentYear}`);
+        const response = await fetch(
+          `/api/all-picks?week=${selectedWeek}&year=${currentYear}`
+        );
         if (response.ok) {
           const data = await response.json();
           setAllUsersPicks(data);
@@ -146,7 +137,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
         if (response.ok) {
           const data: UserPick[] = await response.json();
           const picksMap: Record<string, "away" | "home"> = {};
-          
+
           // Convert team ID picks to home/away for display
           data.forEach((pick) => {
             // If pick is already "home" or "away", use it directly
@@ -154,7 +145,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
               picksMap[pick.gameId] = pick.selectedTeam;
             } else {
               // Otherwise, it's a team ID - convert to home/away by matching against game
-              const game = games.find(g => g.eventId === pick.gameId);
+              const game = games.find((g) => g.eventId === pick.gameId);
               if (game) {
                 if (pick.selectedTeam === game.home.id) {
                   picksMap[pick.gameId] = "home";
@@ -164,7 +155,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
               }
             }
           });
-          
+
           setPicks(picksMap);
           setSavedPicks(picksMap);
         }
@@ -177,11 +168,13 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
   }, [games]);
 
   useEffect(() => {
-    const hasChanges = Object.keys(picks).some(
-      (gameId) => picks[gameId] !== savedPicks[gameId]
-    ) || Object.keys(savedPicks).some(
-      (gameId) => picks[gameId] !== savedPicks[gameId]
-    );
+    const hasChanges =
+      Object.keys(picks).some(
+        (gameId) => picks[gameId] !== savedPicks[gameId]
+      ) ||
+      Object.keys(savedPicks).some(
+        (gameId) => picks[gameId] !== savedPicks[gameId]
+      );
     setHasUnsavedChanges(hasChanges);
   }, [picks, savedPicks]);
 
@@ -233,10 +226,17 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b bg-card p-4 mb-4">
         <div className="flex items-center gap-3">
-                    <WeekDropdown selectedWeek={selectedWeek} onWeekChange={onWeekChange} />
+          <WeekDropdown
+            selectedWeek={selectedWeek}
+            onWeekChange={onWeekChange}
+          />
         </div>
         {hasUnsavedChanges && (
-          <Button onClick={handleSavePicks} disabled={saving} className="font-semibold">
+          <Button
+            onClick={handleSavePicks}
+            disabled={saving}
+            className="font-semibold"
+          >
             {saving && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
             Save Picks
           </Button>

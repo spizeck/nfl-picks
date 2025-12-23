@@ -4,6 +4,7 @@
 
 export interface NormalizedGame {
   eventId: string;
+  date: string;
   away: {
     id: string;
     name: string;
@@ -122,6 +123,7 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
 
   return {
     eventId: event.id,
+    date: event.date,
     away: {
       id: awayTeam.team.id,
       name: awayTeam.team.displayName,
