@@ -52,12 +52,21 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
             const normalized = rawEvents;
 
             setGames(normalized);
-            const firstGameDate = new Date(normalized[0].date);
-            const seasonStart = new Date(currentYear, 8, 1);
+            // Calculate current week based on NFL schedule (Tuesday-Monday)
+            const today = new Date();
+            const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday
+            const seasonStart = new Date(currentYear, 8, 1); // Sept 1st
+            
+            // Find the Tuesday of the current week
+            const tuesdayOffset = currentDay >= 2 ? currentDay - 2 : currentDay + 5;
+            const thisTuesday = new Date(today);
+            thisTuesday.setDate(today.getDate() - tuesdayOffset);
+            
+            // Calculate weeks since season start (based on Tuesdays)
             const weeksSinceStart = Math.floor(
-              (firstGameDate.getTime() - seasonStart.getTime()) /
-                (7 * 24 * 60 * 60 * 1000)
+              (thisTuesday.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
             );
+            
             const currentWeek = Math.max(1, Math.min(18, weeksSinceStart + 1));
             if (selectedWeek === null) {
               onWeekChange(currentWeek);
@@ -79,7 +88,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
     };
 
     fetchCurrentWeek();
-  }, [currentYear]);
+  }, [currentYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selectedWeek === null) return;

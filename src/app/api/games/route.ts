@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +22,16 @@ export async function GET(request: NextRequest) {
       }
       
       const data = await response.json();
-      return NextResponse.json(data.events || []);
+      // Normalize ESPN events before returning
+      const normalized = (data.events || []).map((event: unknown) => {
+        try {
+          return normalizeESPNGame(event as never);
+        } catch (error) {
+          console.error(`Error normalizing event ${(event as { id?: string }).id || 'unknown'}:`, error);
+          return null;
+        }
+      }).filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
+      return NextResponse.json(normalized);
     }
 
     // Query games from Firestore
@@ -63,7 +73,16 @@ export async function GET(request: NextRequest) {
       }
       
       const data = await response.json();
-      return NextResponse.json(data.events || []);
+      // Normalize ESPN events before returning
+      const normalized = (data.events || []).map((event: unknown) => {
+        try {
+          return normalizeESPNGame(event as never);
+        } catch (error) {
+          console.error(`Error normalizing event ${(event as { id?: string }).id || 'unknown'}:`, error);
+          return null;
+        }
+      }).filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
+      return NextResponse.json(normalized);
     }
 
     return NextResponse.json(games);
