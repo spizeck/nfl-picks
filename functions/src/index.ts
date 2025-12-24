@@ -8,6 +8,7 @@
  */
 
 import {setGlobalOptions} from "firebase-functions";
+import { onGameComplete } from "./scheduled-stats-update";
 
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
@@ -24,7 +25,5 @@ import {setGlobalOptions} from "firebase-functions";
 // this will be the maximum concurrent request count.
 setGlobalOptions({ maxInstances: 10 });
 
-// export const helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+// Export the game completion function
+export { onGameComplete };
