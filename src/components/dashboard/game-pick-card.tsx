@@ -36,7 +36,6 @@ export function GamePickCard({
   const gameStartTime = new Date(game.date);
   const now = new Date();
   const hasGameStarted = gameStartTime <= now;
-  const isGameLocked = hasGameStarted;
 
   const awayPicks = hasGameStarted
     ? userPicks.filter((p) => p.selectedTeam === game.away.id)
@@ -105,13 +104,19 @@ export function GamePickCard({
           aria-pressed={isAwaySelected}
         >
           <div className="flex flex-col items-center justify-center h-full gap-2">
-            <Image
-              src={game.away.logo}
-              alt={game.away.name}
-              width={40}
-              height={40}
-              className="h-10 w-10 object-contain"
-            />
+            {game.away.logo ? (
+              <Image
+                src={game.away.logo}
+                alt={game.away.name}
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain"
+              />
+            ) : (
+              <div className="h-10 w-10 flex items-center justify-center bg-muted rounded-full">
+                <span className="text-xs font-bold">{game.away.abbreviation || game.away.name.substring(0, 3).toUpperCase()}</span>
+              </div>
+            )}
             <div className="flex flex-col items-center gap-0.5">
               <p
                 className={cn(
@@ -205,13 +210,19 @@ export function GamePickCard({
           aria-pressed={isHomeSelected}
         >
           <div className="flex flex-col items-center justify-center h-full gap-2">
-            <Image
-              src={game.home.logo}
-              alt={game.home.name}
-              width={40}
-              height={40}
-              className="h-10 w-10 object-contain"
-            />
+            {game.home.logo ? (
+              <Image
+                src={game.home.logo}
+                alt={game.home.name}
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain"
+              />
+            ) : (
+              <div className="h-10 w-10 flex items-center justify-center bg-muted rounded-full">
+                <span className="text-xs font-bold">{game.home.abbreviation || game.home.name.substring(0, 3).toUpperCase()}</span>
+              </div>
+            )}
             <div className="flex flex-col items-center gap-0.5">
               <p
                 className={cn(

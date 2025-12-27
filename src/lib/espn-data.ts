@@ -9,6 +9,7 @@ export interface NormalizedGame {
     id: string;
     name: string;
     logo: string;
+    abbreviation?: string;
     record?: string;
     score?: number;
   };
@@ -16,6 +17,7 @@ export interface NormalizedGame {
     id: string;
     name: string;
     logo: string;
+    abbreviation?: string;
     record?: string;
     score?: number;
   };
