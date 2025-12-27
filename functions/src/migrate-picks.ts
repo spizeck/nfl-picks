@@ -12,7 +12,7 @@ if (!admin.apps.length) {
  * 
  * Run this script once to migrate existing data
  */
-async function migratePicks() {
+export async function migratePicks() {
   const db = admin.firestore();
   
   console.log("Starting picks migration...");
@@ -228,14 +228,3 @@ async function updateSeasonStats(
     { merge: true }
   );
 }
-
-// Run migration
-migratePicks()
-  .then(() => {
-    console.log("Migration script completed successfully");
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("Migration script failed:", error);
-    process.exit(1);
-  });
