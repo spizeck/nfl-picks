@@ -21,8 +21,6 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-const ESPN_API_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
-
 /**
  * Fix game data to match NormalizedGame interface
  */
