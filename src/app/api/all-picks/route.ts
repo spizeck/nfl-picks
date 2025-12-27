@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import type { PickWithUserInfo } from "@/lib/types";
 
 export async function GET(request: Request) {
   try {
@@ -16,50 +17,60 @@ export async function GET(request: Request) {
 
     const adminDb = getAdminDb();
     if (!adminDb) {
-      // Return empty picks object when Firebase Admin not configured
-      // This allows the feature to gracefully degrade on Vercel
       console.warn("Firebase Admin not configured, returning empty picks");
       return NextResponse.json({});
     }
 
-    // Fetch games from Firestore for consistency
-    const gamesSnapshot = await adminDb
-      .collection('games')
-      .where('week', '==', parseInt(week))
-      .where('year', '==', parseInt(year))
-      .get();
-    
-    const gameIds = new Set(gamesSnapshot.docs.map(doc => doc.id));
+    const weekNumber = parseInt(week);
+    const yearNumber = parseInt(year);
 
-    // Get all users
+    const gamesSnapshot = await adminDb
+      .collection("games")
+      .where("week", "==", weekNumber)
+      .where("year", "==", yearNumber)
+      .get();
+
+    const now = new Date();
+    const startedGames = new Map<string, boolean>();
+
+    gamesSnapshot.docs.forEach((doc) => {
+      const gameData = doc.data();
+      const gameStartTime = new Date(gameData.date);
+      startedGames.set(doc.id, gameStartTime <= now);
+    });
+
     const usersSnapshot = await adminDb.collection("users").get();
-    const allPicks: Record<string, Array<{ userId: string; displayName: string; photoURL: string; selectedTeam: string }>> = {};
+    const allPicks: Record<string, PickWithUserInfo[]> = {};
 
     for (const userDoc of usersSnapshot.docs) {
       const userId = userDoc.id;
       const userData = userDoc.data();
 
-      // Get user's picks for this week
       const picksSnapshot = await adminDb
         .collection("users")
         .doc(userId)
+        .collection("seasons")
+        .doc(year)
+        .collection("weeks")
+        .doc(week)
         .collection("picks")
         .get();
 
       picksSnapshot.docs.forEach((pickDoc) => {
         const pick = pickDoc.data();
-        
-        // Only include picks for games in this week
-        if (gameIds.has(pick.gameId)) {
-          if (!allPicks[pick.gameId]) {
-            allPicks[pick.gameId] = [];
+        const gameId = pick.gameId;
+
+        if (startedGames.has(gameId) && startedGames.get(gameId)) {
+          if (!allPicks[gameId]) {
+            allPicks[gameId] = [];
           }
-          
-          allPicks[pick.gameId].push({
+
+          allPicks[gameId].push({
             userId,
             displayName: userData.displayName || "Unknown",
             photoURL: userData.photoURL || "",
             selectedTeam: pick.selectedTeam,
+            result: pick.result,
           });
         }
       });

@@ -141,7 +141,7 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
     status: {
       state,
       displayText,
-      detail,
+      detail: detail || null,
     },
   };
 }

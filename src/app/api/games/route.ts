@@ -1,88 +1,74 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
+import { shouldUpdateScores, markScoresUpdated } from "@/lib/espn-cache";
+import { Timestamp } from "firebase-admin/firestore";
+
+const ESPN_API_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const week = searchParams.get("week");
     const year = searchParams.get("year") || new Date().getFullYear().toString();
-    
-    const adminDb = getAdminDb();
-    if (!adminDb) {
-      // If Firebase Admin is not configured, fall back to ESPN API
-      console.warn("Firebase Admin not configured, falling back to ESPN API");
-      const espnUrl = week 
-        ? `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&year=${year}`
-        : `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard`;
-      
-      const response = await fetch(espnUrl);
-      if (!response.ok) {
-        throw new Error("Failed to fetch data from ESPN API");
-      }
-      
-      const data = await response.json();
-      // Normalize ESPN events before returning
-      const normalized = (data.events || []).map((event: unknown) => {
-        try {
-          return normalizeESPNGame(event as never);
-        } catch (error) {
-          console.error(`Error normalizing event ${(event as { id?: string }).id || 'unknown'}:`, error);
-          return null;
-        }
-      }).filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
-      return NextResponse.json(normalized);
+    const refreshScores = searchParams.get("refreshScores") === "true";
+
+    if (!week) {
+      return NextResponse.json(
+        { error: "Week parameter is required" },
+        { status: 400 }
+      );
     }
 
-    // Query games from Firestore
-    const weekNumber = week ? parseInt(week, 10) : null;
+    const weekNumber = parseInt(week, 10);
     const yearNumber = parseInt(year, 10);
-    
+    const adminDb = getAdminDb();
+
+    if (!adminDb) {
+      console.warn("Firebase Admin not configured, falling back to ESPN API");
+      return await fetchFromESPN(yearNumber, weekNumber);
+    }
+
     let query = adminDb
       .collection("games")
-      .where("year", "==", yearNumber);
-    
-    if (weekNumber) {
-      query = query.where("week", "==", weekNumber);
-    }
-    
-    // Order by date to ensure consistent ordering
-    query = query.orderBy("date", "asc");
-    
+      .where("year", "==", yearNumber)
+      .where("week", "==", weekNumber)
+      .orderBy("date", "asc");
+
     const snapshot = await query.get();
-    const games = snapshot.docs.map(doc => {
+    const games = snapshot.docs.map((doc) => {
       const data = doc.data();
-      // Convert Firestore Timestamps to ISO strings for JSON serialization
       if (data.lastUpdated && data.lastUpdated.toDate) {
         data.lastUpdated = data.lastUpdated.toDate().toISOString();
       }
       return data;
     });
 
-    // If no games found in Firestore, fall back to ESPN API
     if (games.length === 0) {
-      console.log(`No games found in Firestore for week ${week}, year ${year}, falling back to ESPN API`);
-      
-      const espnUrl = week 
-        ? `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&year=${year}`
-        : `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard`;
-      
-      const response = await fetch(espnUrl);
-      if (!response.ok) {
-        throw new Error("Failed to fetch data from ESPN API");
+      console.log(
+        `No games found in Firestore for week ${week}, year ${year}, fetching from ESPN`
+      );
+      return await fetchFromESPN(yearNumber, weekNumber);
+    }
+
+    if (refreshScores) {
+      const canUpdate = await shouldUpdateScores();
+      if (canUpdate) {
+        await updateActiveGameScores(yearNumber, weekNumber, adminDb);
+        await markScoresUpdated(yearNumber, weekNumber);
+
+        const updatedSnapshot = await query.get();
+        const updatedGames = updatedSnapshot.docs.map((doc) => {
+          const data = doc.data();
+          if (data.lastUpdated && data.lastUpdated.toDate) {
+            data.lastUpdated = data.lastUpdated.toDate().toISOString();
+          }
+          return data;
+        });
+        return NextResponse.json(updatedGames);
+      } else {
+        console.log("Score update rate limit active, returning cached data");
       }
-      
-      const data = await response.json();
-      // Normalize ESPN events before returning
-      const normalized = (data.events || []).map((event: unknown) => {
-        try {
-          return normalizeESPNGame(event as never);
-        } catch (error) {
-          console.error(`Error normalizing event ${(event as { id?: string }).id || 'unknown'}:`, error);
-          return null;
-        }
-      }).filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
-      return NextResponse.json(normalized);
     }
 
     return NextResponse.json(games);
@@ -93,4 +79,94 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+async function fetchFromESPN(year: number, week: number) {
+  const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
+  const response = await fetch(espnUrl);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch data from ESPN API");
+  }
+
+  const data = await response.json();
+  const normalized = (data.events || [])
+    .map((event: unknown) => {
+      try {
+        return normalizeESPNGame(event as never);
+      } catch (error) {
+        console.error(
+          `Error normalizing event ${(event as { id?: string }).id || "unknown"}:`,
+          error
+        );
+        return null;
+      }
+    })
+    .filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
+  return NextResponse.json(normalized);
+}
+
+async function updateActiveGameScores(
+  year: number,
+  week: number,
+  adminDb: FirebaseFirestore.Firestore
+) {
+  console.log(`Updating scores for active games in week ${week}, year ${year}`);
+
+  const activeGamesSnapshot = await adminDb
+    .collection("games")
+    .where("year", "==", year)
+    .where("week", "==", week)
+    .where("status.state", "in", ["pre", "in"])
+    .get();
+
+  if (activeGamesSnapshot.empty) {
+    console.log("No active games to update");
+    return;
+  }
+
+  console.log(`Found ${activeGamesSnapshot.size} active games to update`);
+
+  const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
+  const response = await fetch(espnUrl);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch data from ESPN API");
+  }
+
+  const data = await response.json();
+  const events = data.events || [];
+
+  const batch = adminDb.batch();
+  let updatedCount = 0;
+
+  for (const event of events) {
+    try {
+      const normalized = normalizeESPNGame(event);
+
+      const gameDoc = activeGamesSnapshot.docs.find(
+        (doc) => doc.id === normalized.eventId
+      );
+
+      if (gameDoc) {
+        const gameRef = adminDb.collection("games").doc(normalized.eventId);
+        batch.set(
+          gameRef,
+          {
+            ...normalized,
+            week,
+            year,
+            lastUpdated: Timestamp.now(),
+          },
+          { merge: true }
+        );
+        updatedCount++;
+      }
+    } catch (error) {
+      console.error(`Error processing event ${event.id}:`, error);
+    }
+  }
+
+  await batch.commit();
+  console.log(`Updated ${updatedCount} active games`);
 }

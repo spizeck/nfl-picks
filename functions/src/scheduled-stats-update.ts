@@ -1,13 +1,14 @@
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 
-// Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
 interface GameData {
   eventId: string;
+  week: number;
+  year: number;
   away: {
     id: string;
     score?: number;
@@ -21,10 +22,6 @@ interface GameData {
   };
 }
 
-/**
- * Triggered whenever a game document is updated
- * Only processes stats when a game changes from non-final to final
- */
 export const onGameComplete = onDocumentUpdated(
   "games/{gameId}",
   async (event) => {
@@ -32,7 +29,6 @@ export const onGameComplete = onDocumentUpdated(
     const beforeData = event.data?.before.data() as GameData;
     const afterData = event.data?.after.data() as GameData;
 
-    // Only process if game just became final
     if (
       beforeData.status.state === "post" ||
       afterData.status.state !== "post"
@@ -44,10 +40,10 @@ export const onGameComplete = onDocumentUpdated(
     console.log(`Game ${gameId} just completed, updating affected users`);
 
     const db = admin.firestore();
-    const currentYear = new Date().getFullYear();
+    const gameWeek = afterData.week;
+    const gameYear = afterData.year;
 
     try {
-      // Determine the winner
       const homeScore = Number(afterData.home.score ?? 0);
       const awayScore = Number(afterData.away.score ?? 0);
 
@@ -63,111 +59,58 @@ export const onGameComplete = onDocumentUpdated(
         return;
       }
 
-      // Find all users who picked this game using collectionGroup query
-      const picksSnapshot = await db
-        .collectionGroup("picks")
-        .where("gameId", "==", gameId)
-        .get();
-
-      console.log(`Found ${picksSnapshot.size} picks for game ${gameId}`);
-
-      // Process each user's pick
-      const batch = db.batch();
+      const usersSnapshot = await db.collection("users").get();
       const usersToUpdate = new Set<string>();
+      const batch = db.batch();
 
-      for (const pickDoc of picksSnapshot.docs) {
-        const pick = pickDoc.data();
+      for (const userDoc of usersSnapshot.docs) {
+        const userId = userDoc.id;
+        const pickRef = db
+          .collection("users")
+          .doc(userId)
+          .collection("seasons")
+          .doc(gameYear.toString())
+          .collection("weeks")
+          .doc(gameWeek.toString())
+          .collection("picks")
+          .doc(gameId);
 
-        // Extract userId from the document path
-        // Path format: users/{userId}/picks/{pickId}
-        const userId = pickDoc.ref.parent.parent?.id;
-        if (!userId) {
-          console.error(
-            `Could not extract userId from pick path: ${pickDoc.ref.path}`
-          );
+        const pickDoc = await pickRef.get();
+        if (!pickDoc.exists) {
           continue;
         }
 
-        // Normalize pick to team ID
-        let userPickedTeamId = pick.selectedTeam;
-        if (pick.selectedTeam === "home") {
+        const pick = pickDoc.data();
+        let userPickedTeamId = pick!.selectedTeam;
+
+        if (pick!.selectedTeam === "home") {
           userPickedTeamId = afterData.home.id;
-        } else if (pick.selectedTeam === "away") {
+        } else if (pick!.selectedTeam === "away") {
           userPickedTeamId = afterData.away.id;
         }
 
-        // Determine if user won this pick
         const didWin = userPickedTeamId === winningTeamId;
 
-        // Update the pick document with result
-        batch.update(pickDoc.ref, {
+        batch.update(pickRef, {
           result: didWin ? "win" : "loss",
+          locked: true,
           processedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
         usersToUpdate.add(userId);
       }
 
-      // Commit pick updates
       await batch.commit();
 
-      // Recalculate stats for affected users
-      const statsBatch = db.batch();
+      console.log(`Updated ${usersToUpdate.size} picks for game ${gameId}`);
 
       for (const userId of usersToUpdate) {
-        // Get all processed picks for this user
-        const userPicksSnapshot = await db
-          .collection("users")
-          .doc(userId)
-          .collection("picks")
-          .where("result", "in", ["win", "loss"])
-          .get();
-
-        let seasonWins = 0;
-        let seasonLosses = 0;
-
-        for (const pickDoc of userPicksSnapshot.docs) {
-          const pick = pickDoc.data();
-          if (pick.result === "win") {
-            seasonWins++;
-          } else if (pick.result === "loss") {
-            seasonLosses++;
-          }
-        }
-
-        // Update user stats
-        const userRef = db.collection("users").doc(userId);
-        statsBatch.set(
-          userRef,
-          {
-            stats: {
-              [`season${currentYear}`]: {
-                wins: seasonWins,
-                losses: seasonLosses,
-                winPercentage:
-                  seasonWins + seasonLosses > 0
-                    ? (seasonWins / (seasonWins + seasonLosses)) * 100
-                    : 0,
-              },
-              allTime: {
-                wins: seasonWins,
-                losses: seasonLosses,
-                winPercentage:
-                  seasonWins + seasonLosses > 0
-                    ? (seasonWins / (seasonWins + seasonLosses)) * 100
-                    : 0,
-              },
-            },
-            lastStatsUpdate: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
+        await updateWeekStats(db, userId, gameYear, gameWeek);
+        await updateSeasonStats(db, userId, gameYear);
       }
 
-      await statsBatch.commit();
-
       console.log(
-        `Successfully updated ${usersToUpdate.size} users for completed game ${gameId}`
+        `Successfully updated stats for ${usersToUpdate.size} users`
       );
     } catch (error) {
       console.error(`Error processing game completion for ${gameId}:`, error);
@@ -175,3 +118,104 @@ export const onGameComplete = onDocumentUpdated(
     }
   }
 );
+
+async function updateWeekStats(
+  db: admin.firestore.Firestore,
+  userId: string,
+  year: number,
+  week: number
+) {
+  const picksSnapshot = await db
+    .collection("users")
+    .doc(userId)
+    .collection("seasons")
+    .doc(year.toString())
+    .collection("weeks")
+    .doc(week.toString())
+    .collection("picks")
+    .get();
+
+  let wins = 0;
+  let losses = 0;
+  let pending = 0;
+
+  picksSnapshot.docs.forEach((doc) => {
+    const pick = doc.data();
+    if (pick.result === "win") wins++;
+    else if (pick.result === "loss") losses++;
+    else pending++;
+  });
+
+  const weekStatsRef = db
+    .collection("users")
+    .doc(userId)
+    .collection("seasons")
+    .doc(year.toString())
+    .collection("weeks")
+    .doc(week.toString());
+
+  await weekStatsRef.set(
+    {
+      wins,
+      losses,
+      pending,
+      total: wins + losses + pending,
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  console.log(`Updated week ${week} stats for user ${userId}: ${wins}-${losses}`);
+}
+
+async function updateSeasonStats(
+  db: admin.firestore.Firestore,
+  userId: string,
+  year: number
+) {
+  const weeksSnapshot = await db
+    .collection("users")
+    .doc(userId)
+    .collection("seasons")
+    .doc(year.toString())
+    .collection("weeks")
+    .get();
+
+  let totalWins = 0;
+  let totalLosses = 0;
+  let totalGames = 0;
+  const weeklyRecords: Record<number, string> = {};
+
+  weeksSnapshot.docs.forEach((doc) => {
+    const weekData = doc.data();
+    const weekNumber = parseInt(doc.id);
+    const wins = weekData.wins || 0;
+    const losses = weekData.losses || 0;
+
+    totalWins += wins;
+    totalLosses += losses;
+    totalGames += wins + losses;
+    weeklyRecords[weekNumber] = `${wins}-${losses}`;
+  });
+
+  const seasonStatsRef = db
+    .collection("users")
+    .doc(userId)
+    .collection("seasons")
+    .doc(year.toString());
+
+  await seasonStatsRef.set(
+    {
+      totalWins,
+      totalLosses,
+      totalGames,
+      weeklyRecords,
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  console.log(
+    `Updated season ${year} stats for user ${userId}: ${totalWins}-${totalLosses}`
+  );
+}

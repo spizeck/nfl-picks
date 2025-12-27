@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, getAdminAuth } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
+import type { UserPick } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,19 +36,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { gameId, selectedTeam } = await request.json();
+    const { gameId, selectedTeam, week, year } = await request.json();
 
-    if (!gameId || !selectedTeam) {
+    if (!gameId || !selectedTeam || !week || !year) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields: gameId, selectedTeam, week, year" },
         { status: 400 }
       );
     }
 
-    // Use the verified user ID from the token
     const userId = decodedToken.uid;
-
-    // Save the user's pick to Firestore using Admin SDK
     const adminDb = getAdminDb();
     if (!adminDb) {
       return NextResponse.json(
@@ -55,17 +53,42 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-    
-    await adminDb
+
+    const gameDoc = await adminDb.collection("games").doc(gameId).get();
+    if (!gameDoc.exists) {
+      return NextResponse.json(
+        { error: "Game not found" },
+        { status: 404 }
+      );
+    }
+
+    const gameData = gameDoc.data();
+    const gameStartTime = Timestamp.fromDate(new Date(gameData!.date));
+    const now = Timestamp.now();
+    const isLocked = gameStartTime.toMillis() <= now.toMillis();
+
+    const pickData: Partial<UserPick> = {
+      gameId,
+      selectedTeam,
+      timestamp: now,
+      result: "pending",
+      locked: isLocked,
+      gameStartTime,
+    };
+
+    const pickRef = adminDb
       .collection("users")
       .doc(userId)
+      .collection("seasons")
+      .doc(year.toString())
+      .collection("weeks")
+      .doc(week.toString())
       .collection("picks")
-      .doc(gameId)
-      .set({
-        gameId,
-        selectedTeam,
-        timestamp: Timestamp.now(),
-      });
+      .doc(gameId);
+
+    await pickRef.set(pickData);
+
+    await updateWeekStats(adminDb, userId, year, week);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -79,7 +102,6 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the authorization header
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
@@ -88,7 +110,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Extract and verify the token
     const token = authHeader.split("Bearer ")[1];
     const adminAuth = getAdminAuth();
     if (!adminAuth) {
@@ -108,10 +129,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Use the verified user ID from the token
     const userId = decodedToken.uid;
-
-    // Get all picks for the user using Admin SDK
     const adminDb = getAdminDb();
     if (!adminDb) {
       return NextResponse.json(
@@ -119,10 +137,25 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-    
+
+    const searchParams = request.nextUrl.searchParams;
+    const week = searchParams.get("week");
+    const year = searchParams.get("year") || new Date().getFullYear().toString();
+
+    if (!week) {
+      return NextResponse.json(
+        { error: "Week parameter is required" },
+        { status: 400 }
+      );
+    }
+
     const picksSnapshot = await adminDb
       .collection("users")
       .doc(userId)
+      .collection("seasons")
+      .doc(year)
+      .collection("weeks")
+      .doc(week)
       .collection("picks")
       .get();
     
@@ -139,4 +172,50 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+async function updateWeekStats(
+  adminDb: FirebaseFirestore.Firestore,
+  userId: string,
+  year: number,
+  week: number
+) {
+  const picksSnapshot = await adminDb
+    .collection("users")
+    .doc(userId)
+    .collection("seasons")
+    .doc(year.toString())
+    .collection("weeks")
+    .doc(week.toString())
+    .collection("picks")
+    .get();
+
+  let wins = 0;
+  let losses = 0;
+  let pending = 0;
+
+  picksSnapshot.docs.forEach((doc) => {
+    const pick = doc.data();
+    if (pick.result === "win") wins++;
+    else if (pick.result === "loss") losses++;
+    else pending++;
+  });
+
+  const weekStatsRef = adminDb
+    .collection("users")
+    .doc(userId)
+    .collection("seasons")
+    .doc(year.toString())
+    .collection("weeks")
+    .doc(week.toString());
+
+  await weekStatsRef.set(
+    {
+      wins,
+      losses,
+      pending,
+      total: wins + losses + pending,
+    },
+    { merge: true }
+  );
 }

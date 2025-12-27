@@ -11,6 +11,7 @@ interface UserPickInfo {
   displayName: string;
   photoURL: string;
   selectedTeam: string;
+  result?: "win" | "loss" | "pending";
 }
 
 interface GamePickCardProps {
@@ -32,13 +33,15 @@ export function GamePickCard({
   const isHomeSelected = selectedSide === "home";
   const isGameLive = game.status.state === "in";
   const isGameFinal = game.status.state === "post";
-  const isGameLocked = isGameLive || isGameFinal;
+  const gameStartTime = new Date(game.date);
+  const now = new Date();
+  const hasGameStarted = gameStartTime <= now;
+  const isGameLocked = hasGameStarted;
 
-  // Filter picks by team for locked games
-  const awayPicks = isGameLocked
+  const awayPicks = hasGameStarted
     ? userPicks.filter((p) => p.selectedTeam === game.away.id)
     : [];
-  const homePicks = isGameLocked
+  const homePicks = hasGameStarted
     ? userPicks.filter((p) => p.selectedTeam === game.home.id)
     : [];
 
@@ -126,18 +129,26 @@ export function GamePickCard({
                 </p>
               )}
             </div>
-            {isGameLocked && awayPicks.length > 0 && (
-              <div className="flex gap-1 mt-1">
+            {hasGameStarted && awayPicks.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1 justify-center">
                 {awayPicks.map((pick) => (
-                  <Avatar
-                    key={pick.userId}
-                    className="h-6 w-6 border-2 border-background"
-                  >
-                    <AvatarImage src={pick.photoURL} alt={pick.displayName} />
-                    <AvatarFallback className="text-xs">
-                      {pick.displayName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div key={pick.userId} className="relative">
+                    <Avatar className="h-6 w-6 border-2 border-background">
+                      <AvatarImage src={pick.photoURL} alt={pick.displayName} />
+                      <AvatarFallback className="text-xs">
+                        {pick.displayName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {isGameFinal && pick.result && (
+                      <div className="absolute -top-1 -right-1 bg-background rounded-full">
+                        {pick.result === "win" ? (
+                          <Check className="h-3 w-3 text-green-600" strokeWidth={3} />
+                        ) : (
+                          <X className="h-3 w-3 text-red-600" strokeWidth={3} />
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -218,18 +229,26 @@ export function GamePickCard({
                 </p>
               )}
             </div>
-            {isGameLocked && homePicks.length > 0 && (
-              <div className="flex gap-1 mt-1">
+            {hasGameStarted && homePicks.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1 justify-center">
                 {homePicks.map((pick) => (
-                  <Avatar
-                    key={pick.userId}
-                    className="h-6 w-6 border-2 border-background"
-                  >
-                    <AvatarImage src={pick.photoURL} alt={pick.displayName} />
-                    <AvatarFallback className="text-xs">
-                      {pick.displayName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div key={pick.userId} className="relative">
+                    <Avatar className="h-6 w-6 border-2 border-background">
+                      <AvatarImage src={pick.photoURL} alt={pick.displayName} />
+                      <AvatarFallback className="text-xs">
+                        {pick.displayName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {isGameFinal && pick.result && (
+                      <div className="absolute -top-1 -right-1 bg-background rounded-full">
+                        {pick.result === "win" ? (
+                          <Check className="h-3 w-3 text-green-600" strokeWidth={3} />
+                        ) : (
+                          <X className="h-3 w-3 text-red-600" strokeWidth={3} />
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

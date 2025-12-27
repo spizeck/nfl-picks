@@ -131,29 +131,31 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
   }, [selectedWeek, currentYear]);
 
   useEffect(() => {
+    if (selectedWeek === null) return;
+
     const fetchPicks = async () => {
       const auth = getFirebaseAuth();
       if (!auth?.currentUser) return;
 
       try {
         const token = await auth.currentUser.getIdToken();
-        const response = await fetch("/api/user-picks", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await fetch(
+          `/api/user-picks?week=${selectedWeek}&year=${currentYear}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         if (response.ok) {
           const data: UserPick[] = await response.json();
           const picksMap: Record<string, "away" | "home"> = {};
 
-          // Convert team ID picks to home/away for display
           data.forEach((pick) => {
-            // If pick is already "home" or "away", use it directly
             if (pick.selectedTeam === "home" || pick.selectedTeam === "away") {
               picksMap[pick.gameId] = pick.selectedTeam;
             } else {
-              // Otherwise, it's a team ID - convert to home/away by matching against game
               const game = games.find((g) => g.eventId === pick.gameId);
               if (game) {
                 if (pick.selectedTeam === game.home.id) {
@@ -174,7 +176,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
     };
 
     fetchPicks();
-  }, [games]);
+  }, [games, selectedWeek, currentYear]);
 
   useEffect(() => {
     const hasChanges =
@@ -196,22 +198,35 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
 
   const handleSavePicks = async () => {
     const auth = getFirebaseAuth();
-    if (!auth?.currentUser) return;
+    if (!auth?.currentUser || selectedWeek === null) return;
 
     setSaving(true);
     try {
       const token = await auth.currentUser.getIdToken();
 
-      const savePromises = Object.entries(picks).map(([gameId, selectedTeam]) =>
-        fetch("/api/user-picks", {
+      const savePromises = Object.entries(picks).map(([gameId, selectedTeam]) => {
+        const game = games.find((g) => g.eventId === gameId);
+        const teamId =
+          selectedTeam === "home"
+            ? game?.home.id
+            : selectedTeam === "away"
+            ? game?.away.id
+            : selectedTeam;
+
+        return fetch("/api/user-picks", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ gameId, selectedTeam }),
-        })
-      );
+          body: JSON.stringify({
+            gameId,
+            selectedTeam: teamId,
+            week: selectedWeek,
+            year: currentYear,
+          }),
+        });
+      });
 
       await Promise.all(savePromises);
       setSavedPicks(picks);
