@@ -57,49 +57,67 @@ async function fixGameData() {
     console.log(`Fixing game ${gameId}...`);
     
     try {
-      // Fetch fresh data from ESPN
-      const response = await fetch(
-        `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${gameId}`
+      // First try to get data from the scoreboard API which has logos for all games
+      const week = gameData.week;
+      const year = gameData.year;
+      const scoreboardResponse = await fetch(
+        `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${year}&seasontype=2&week=${week}`
       );
       
-      if (!response.ok) {
-        console.log(`  ⚠️  Failed to fetch (HTTP ${response.status}), using existing data`);
-        
-        // Fix with existing data
-        const updates: any = {};
-        
-        if (!gameData.eventId) {
-          updates.eventId = gameId;
+      let eventData = null;
+      if (scoreboardResponse.ok) {
+        const scoreboardData = await scoreboardResponse.json();
+        const event = scoreboardData.events?.find((e: any) => e.id === gameId);
+        if (event) {
+          eventData = event;
         }
-        
-        if (typeof gameData.status === 'string') {
-          const statusState = gameData.status === 'post' ? 'post' : 
-                            gameData.status === 'in' ? 'in' : 'pre';
-          updates.status = {
-            state: statusState,
-            displayText: gameData.status,
-            detail: `${gameData.away?.score || 0}–${gameData.home?.score || 0}`
-          };
-        }
-        
-        if (Object.keys(updates).length > 0) {
-          await gameDoc.ref.update(updates);
-          fixedCount++;
-          console.log(`  ✓ Fixed with existing data`);
-        }
-        
-        continue;
       }
       
-      const data = await response.json();
-      const event = data.header?.competitions?.[0];
+      // Fallback to summary API if not found in scoreboard
+      if (!eventData) {
+        const response = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${gameId}`
+        );
+        
+        if (!response.ok) {
+          console.log(`  ⚠️  Failed to fetch (HTTP ${response.status}), using existing data`);
+          
+          // Fix with existing data
+          const updates: any = {};
+          
+          if (!gameData.eventId) {
+            updates.eventId = gameId;
+          }
+          
+          if (typeof gameData.status === 'string') {
+            const statusState = gameData.status === 'post' ? 'post' : 
+                              gameData.status === 'in' ? 'in' : 'pre';
+            updates.status = {
+              state: statusState,
+              displayText: gameData.status,
+              detail: `${gameData.away?.score || 0}–${gameData.home?.score || 0}`
+            };
+          }
+          
+          if (Object.keys(updates).length > 0) {
+            await gameDoc.ref.update(updates);
+            fixedCount++;
+            console.log(`  ✓ Fixed with existing data`);
+          }
+          
+          continue;
+        }
+        
+        const data = await response.json();
+        eventData = data.header?.competitions?.[0] ? { competitions: [data.header.competitions[0]] } : null;
+      }
       
-      if (!event) {
+      if (!eventData || !eventData.competitions || eventData.competitions.length === 0) {
         console.log(`  ⚠️  No event data found`);
         continue;
       }
       
-      const competition = event;
+      const competition = eventData.competitions[0];
       const competitors = competition.competitors || [];
       const homeTeam = competitors.find((c: any) => c.homeAway === "home");
       const awayTeam = competitors.find((c: any) => c.homeAway === "away");
@@ -146,8 +164,8 @@ async function fixGameData() {
       // Update game with complete data
       const updatedGame: any = {
         eventId: gameId,
-        week: data.header?.week || gameData.week,
-        year: data.header?.season?.year || gameData.year,
+        week: gameData.week,
+        year: gameData.year,
         date: competition.date || gameData.date,
         status: {
           state,

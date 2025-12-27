@@ -126,35 +126,26 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
 
         if (response.ok) {
           const data: UserPick[] = await response.json();
-          console.log(`Fetched ${data.length} picks for week ${selectedWeek}:`, data);
           const picksMap: Record<string, "away" | "home"> = {};
 
           data.forEach((pick) => {
             if (pick.selectedTeam === "home" || pick.selectedTeam === "away") {
               picksMap[pick.gameId] = pick.selectedTeam;
-              console.log(`✓ Pick ${pick.gameId}: ${pick.selectedTeam} (already correct format)`);
             } else {
               // Convert team ID back to "away" or "home"
               const game = games.find((g) => g.eventId === pick.gameId);
               if (game) {
                 if (pick.selectedTeam === game.home.id) {
                   picksMap[pick.gameId] = "home";
-                  console.log(`✓ Pick ${pick.gameId}: converted team ID ${pick.selectedTeam} to home`);
                 } else if (pick.selectedTeam === game.away.id) {
                   picksMap[pick.gameId] = "away";
-                  console.log(`✓ Pick ${pick.gameId}: converted team ID ${pick.selectedTeam} to away`);
                 }
-              } else {
-                console.warn(`Game ${pick.gameId} not found for pick conversion`);
               }
             }
           });
 
-          console.log('Final picks map:', picksMap);
           setPicks(picksMap);
           setSavedPicks(picksMap);
-        } else {
-          console.error(`Failed to fetch picks: ${response.status} ${response.statusText}`);
         }
       } catch (error) {
         console.error("Error fetching picks:", error);
