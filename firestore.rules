@@ -17,8 +17,8 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      // Users can read their own profile
-      allow read: if request.auth != null && request.auth.uid == userId;
+      // All authenticated users can read profiles (for leaderboard and avatars)
+      allow read: if request.auth != null;
       // Users can update their own profile
       allow update: if request.auth != null && request.auth.uid == userId;
       // Only backend can create user documents

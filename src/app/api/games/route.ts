@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       return await fetchFromESPN(yearNumber, weekNumber);
     }
 
-    let query = adminDb
+    const query = adminDb
       .collection("games")
       .where("year", "==", yearNumber)
       .where("week", "==", weekNumber)
@@ -41,6 +41,24 @@ export async function GET(request: NextRequest) {
       if (data.lastUpdated && data.lastUpdated.toDate) {
         data.lastUpdated = data.lastUpdated.toDate().toISOString();
       }
+      
+      // Ensure data matches NormalizedGame interface
+      // Handle both old format (eventId) and new format (id)
+      if (!data.eventId && data.id) {
+        data.eventId = data.id;
+      }
+      
+      // Ensure status has the correct structure
+      if (data.status && typeof data.status === 'string') {
+        // Convert old string status to new object format
+        const statusState = data.status === 'post' ? 'post' : data.status === 'in' ? 'in' : 'pre';
+        data.status = {
+          state: statusState,
+          displayText: data.status,
+          detail: data.away && data.home ? `${data.away.score || 0}–${data.home.score || 0}` : undefined
+        };
+      }
+      
       return data;
     });
 

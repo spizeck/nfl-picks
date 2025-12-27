@@ -9,7 +9,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { getFirestoreDb } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 
 interface LeaderboardEntry {
   uid: string;
@@ -21,7 +21,12 @@ interface LeaderboardEntry {
 
 type TimePeriod = "week" | "season" | "allTime";
 
-export function LeaderboardCard() {
+interface LeaderboardCardProps {
+  selectedWeek?: number | null;
+  selectedYear?: number;
+}
+
+export function LeaderboardCard({ selectedWeek, selectedYear = 2025 }: LeaderboardCardProps = {}) {
   const [open, setOpen] = useState(true);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,35 +41,60 @@ export function LeaderboardCard() {
     try {
       const usersSnapshot = await getDocs(collection(db, "users"));
       const entries: LeaderboardEntry[] = [];
-      const currentYear = new Date().getFullYear();
 
       for (const userDoc of usersSnapshot.docs) {
         const userData = userDoc.data();
+        let wins = 0;
+        let losses = 0;
 
-        // Get stats based on selected time period
-        let stats;
-        if (timePeriod === "allTime") {
-          stats = userData.stats?.allTime || {
-            wins: 0,
-            losses: 0,
-            winPercentage: 0,
-          };
+        if (timePeriod === "week" && selectedWeek) {
+          // Fetch weekly stats from new hierarchical structure
+          const weekDocRef = doc(
+            db,
+            `users/${userDoc.id}/seasons/${selectedYear}/weeks/${selectedWeek}`
+          );
+          const weekDoc = await getDoc(weekDocRef);
+          
+          if (weekDoc.exists()) {
+            const weekData = weekDoc.data();
+            wins = weekData.wins || 0;
+            losses = weekData.losses || 0;
+          }
+        } else if (timePeriod === "season") {
+          // Fetch season stats from new hierarchical structure
+          const seasonDocRef = doc(
+            db,
+            `users/${userDoc.id}/seasons/${selectedYear}`
+          );
+          const seasonDoc = await getDoc(seasonDocRef);
+          
+          if (seasonDoc.exists()) {
+            const seasonData = seasonDoc.data();
+            wins = seasonData.totalWins || 0;
+            losses = seasonData.totalLosses || 0;
+          }
         } else {
-          // Both "week" and "season" use season stats for now
-          // TODO: Implement per-week stats in the future
-          stats = userData.stats?.[`season${currentYear}`] || {
-            wins: 0,
-            losses: 0,
-            winPercentage: 0,
-          };
+          // All time - sum all seasons
+          const seasonsSnapshot = await getDocs(
+            collection(db, `users/${userDoc.id}/seasons`)
+          );
+          
+          seasonsSnapshot.docs.forEach((seasonDoc) => {
+            const seasonData = seasonDoc.data();
+            wins += seasonData.totalWins || 0;
+            losses += seasonData.totalLosses || 0;
+          });
         }
+
+        const totalGames = wins + losses;
+        const winPercentage = totalGames > 0 ? (wins / totalGames) * 100 : 0;
 
         entries.push({
           uid: userDoc.id,
           displayName: userData.displayName || "Anonymous",
-          wins: stats.wins || 0,
-          losses: stats.losses || 0,
-          winPercentage: stats.winPercentage || 0,
+          wins,
+          losses,
+          winPercentage,
         });
       }
 
@@ -79,7 +109,7 @@ export function LeaderboardCard() {
   useEffect(() => {
     fetchLeaderboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timePeriod]);
+  }, [timePeriod, selectedWeek, selectedYear]);
 
   const sortedLeaderboard = [...leaderboard].sort((a, b) => {
     if (sortBy === "wins") {
@@ -120,6 +150,15 @@ export function LeaderboardCard() {
           <div className="p-4 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant={timePeriod === "week" ? "default" : "outline"}
+                  onClick={() => setTimePeriod("week")}
+                  className="font-semibold"
+                  disabled={!selectedWeek}
+                >
+                  Week
+                </Button>
                 <Button
                   size="sm"
                   variant={timePeriod === "season" ? "default" : "outline"}

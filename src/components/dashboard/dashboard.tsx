@@ -30,7 +30,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
-  const [currentYear] = useState(2024); // Hardcode to 2024 for current NFL season
+  const [currentYear] = useState(2025); // Updated to 2025 for current NFL season
   const [games, setGames] = useState<NormalizedGame[]>([]);
   const [picks, setPicks] = useState<Record<string, "away" | "home">>({});
   const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});
@@ -44,43 +44,19 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
   useEffect(() => {
     const fetchCurrentWeek = async () => {
       try {
-        const response = await fetch(`/api/games?year=${currentYear}`);
+        const response = await fetch('/api/current-week');
         if (response.ok) {
-          const rawEvents = await response.json();
-          if (rawEvents.length > 0) {
-            // The games API returns normalized data directly
-            const normalized = rawEvents;
-
-            setGames(normalized);
-            // Calculate current week based on NFL schedule (Tuesday-Monday)
-            const today = new Date();
-            const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday
-            const seasonStart = new Date(currentYear, 8, 1); // Sept 1st
-            
-            // Find the Tuesday of the current week
-            const tuesdayOffset = currentDay >= 2 ? currentDay - 2 : currentDay + 5;
-            const thisTuesday = new Date(today);
-            thisTuesday.setDate(today.getDate() - tuesdayOffset);
-            
-            // Calculate weeks since season start (based on Tuesdays)
-            const weeksSinceStart = Math.floor(
-              (thisTuesday.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
-            );
-            
-            const currentWeek = Math.max(1, Math.min(18, weeksSinceStart + 1));
-            if (selectedWeek === null) {
-              onWeekChange(currentWeek);
-            }
-          } else if (selectedWeek === null) {
-            onWeekChange(1);
+          const data = await response.json();
+          if (selectedWeek === null) {
+            onWeekChange(data.week);
           }
         } else if (selectedWeek === null) {
-          onWeekChange(1);
+          onWeekChange(17); // Default to week 17 if API fails
         }
       } catch (error) {
         console.error("Error fetching current week:", error);
         if (selectedWeek === null) {
-          onWeekChange(1);
+          onWeekChange(17); // Default to week 17 if API fails
         }
       } finally {
         setLoading(false);
@@ -131,7 +107,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
   }, [selectedWeek, currentYear]);
 
   useEffect(() => {
-    if (selectedWeek === null) return;
+    if (selectedWeek === null || games.length === 0) return;
 
     const fetchPicks = async () => {
       const auth = getFirebaseAuth();
@@ -156,6 +132,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
             if (pick.selectedTeam === "home" || pick.selectedTeam === "away") {
               picksMap[pick.gameId] = pick.selectedTeam;
             } else {
+              // Convert team ID back to "away" or "home"
               const game = games.find((g) => g.eventId === pick.gameId);
               if (game) {
                 if (pick.selectedTeam === game.home.id) {
@@ -163,6 +140,8 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
                 } else if (pick.selectedTeam === game.away.id) {
                   picksMap[pick.gameId] = "away";
                 }
+              } else {
+                console.warn(`Game ${pick.gameId} not found for pick conversion`);
               }
             }
           });
@@ -267,7 +246,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
         )}
       </div>
 
-      <LeaderboardCard />
+      <LeaderboardCard selectedWeek={selectedWeek} selectedYear={currentYear} />
 
       <div>
         {games.map((game) => (
