@@ -1,0 +1,88 @@
+[debug] [2025-12-27T19:42:37.755Z] ----------------------------------------------------------------------
+[debug] [2025-12-27T19:42:37.757Z] Command:       C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2025-12-27T19:42:37.757Z] CLI Version:   15.1.0
+[debug] [2025-12-27T19:42:37.758Z] Platform:      win32
+[debug] [2025-12-27T19:42:37.758Z] Node Version:  v20.19.1
+[debug] [2025-12-27T19:42:37.758Z] Time:          Sat Dec 27 2025 15:42:37 GMT-0400 (Bolivia Time)
+[debug] [2025-12-27T19:42:37.758Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-27T19:43:04.578Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-27T19:43:04.578Z] > authorizing via signed-in user (chadnuttall1@gmail.com)
+[debug] [2025-12-27T19:43:04.579Z] [iam] checking project cj-nfl-picks for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-12-27T19:43:04.580Z] Checked if tokens are valid: false, expires at: 1766862195745
+[debug] [2025-12-27T19:43:04.580Z] Checked if tokens are valid: false, expires at: 1766862195745
+[debug] [2025-12-27T19:43:04.581Z] > refreshing access token with scopes: []
+[debug] [2025-12-27T19:43:04.583Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-12-27T19:43:04.583Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-27T19:43:04.950Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-12-27T19:43:04.950Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-27T19:43:04.981Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/cj-nfl-picks:testIamPermissions [none]
+[debug] [2025-12-27T19:43:04.981Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/cj-nfl-picks:testIamPermissions x-goog-quota-user=projects/cj-nfl-picks
+[debug] [2025-12-27T19:43:04.981Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/cj-nfl-picks:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-12-27T19:43:05.372Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/cj-nfl-picks:testIamPermissions 200
+[debug] [2025-12-27T19:43:05.372Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/cj-nfl-picks:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-12-27T19:43:05.373Z] Checked if tokens are valid: true, expires at: 1766868183950
+[debug] [2025-12-27T19:43:05.373Z] Checked if tokens are valid: true, expires at: 1766868183950
+[debug] [2025-12-27T19:43:05.373Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/cj-nfl-picks/serviceAccounts/cj-nfl-picks@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-12-27T19:43:05.373Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/cj-nfl-picks/serviceAccounts/cj-nfl-picks@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-12-27T19:43:05.832Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/cj-nfl-picks/serviceAccounts/cj-nfl-picks@appspot.gserviceaccount.com:testIamPermissions 404
+[debug] [2025-12-27T19:43:05.832Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/cj-nfl-picks/serviceAccounts/cj-nfl-picks@appspot.gserviceaccount.com:testIamPermissions {"error":{"code":404,"message":"Unknown service account","status":"NOT_FOUND"}}
+[debug] [2025-12-27T19:43:05.832Z] [functions] service account IAM check errored, deploy may fail: Request to https://iam.googleapis.com/v1/projects/cj-nfl-picks/serviceAccounts/cj-nfl-picks@appspot.gserviceaccount.com:testIamPermissions had HTTP Error: 404, Unknown service account {"name":"FirebaseError","children":[],"context":{"body":{"error":{"code":404,"message":"Unknown service account","status":"NOT_FOUND"}},"response":{"statusCode":404}},"exit":1,"message":"Request to https://iam.googleapis.com/v1/projects/cj-nfl-picks/serviceAccounts/cj-nfl-picks@appspot.gserviceaccount.com:testIamPermissions had HTTP Error: 404, Unknown service account","status":404}
+[info] 
+[info] === Deploying to 'cj-nfl-picks'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
+[info] +  functions: Finished running predeploy script. 
+[debug] [2025-12-27T19:43:13.640Z] Checked if tokens are valid: true, expires at: 1766868183950
+[debug] [2025-12-27T19:43:13.640Z] Checked if tokens are valid: true, expires at: 1766868183950
+[debug] [2025-12-27T19:43:13.640Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/cj-nfl-picks [none]
+[debug] [2025-12-27T19:43:14.031Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/cj-nfl-picks 200
+[debug] [2025-12-27T19:43:14.031Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/cj-nfl-picks {"projectNumber":"121741116790","projectId":"cj-nfl-picks","lifecycleState":"ACTIVE","name":"cj-nfl-picks","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-12-19T23:05:54.755555Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-12-27T19:43:14.034Z] Checked if tokens are valid: true, expires at: 1766868183950
+[debug] [2025-12-27T19:43:14.034Z] Checked if tokens are valid: true, expires at: 1766868183950
+[debug] [2025-12-27T19:43:14.035Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/cj-nfl-picks/adminSdkConfig [none]
+[debug] [2025-12-27T19:43:14.466Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/cj-nfl-picks/adminSdkConfig 200
+[debug] [2025-12-27T19:43:14.466Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/cj-nfl-picks/adminSdkConfig {"projectId":"cj-nfl-picks","storageBucket":"cj-nfl-picks.firebasestorage.app"}
+[debug] [2025-12-27T19:43:14.468Z] Validating nodejs source
+[debug] [2025-12-27T19:43:15.423Z] > [functions] package.json contents: {
+  "name": "functions",
+  "scripts": {
+    "lint": "eslint .",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "24"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^7.0.0"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.50.1",
+    "@typescript-eslint/parser": "^8.50.1",
+    "eslint": "^8.9.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-import": "^2.25.4",
+    "firebase-functions-test": "^3.4.1",
+    "typescript": "^5.7.3"
+  },
+  "private": true
+}
+[debug] [2025-12-27T19:43:15.424Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase default to determine what to deploy 
+[debug] [2025-12-27T19:43:15.425Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-12-27T19:43:15.433Z] Found firebase-functions binary at 'C:\Users\chadn\CodingProjects\NFLPicks\nfl-picks\functions\node_modules\.bin\firebase-functions'
+[info] Serving at port 8042
+
