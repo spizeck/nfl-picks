@@ -30,7 +30,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
-  const [currentYear] = useState(new Date().getFullYear());
+  const [currentYear] = useState(2024); // Hardcode to 2024 for current NFL season
   const [games, setGames] = useState<NormalizedGame[]>([]);
   const [picks, setPicks] = useState<Record<string, "away" | "home">>({});
   const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});

@@ -22,23 +22,14 @@ export async function GET(request: Request) {
       return NextResponse.json({});
     }
 
-    // Fetch games directly from ESPN to avoid localhost issues on Vercel
-    const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${year}&seasontype=2&week=${week}`;
-    const espnResponse = await fetch(espnUrl);
-    const espnData = await espnResponse.json();
-    const rawGames = espnData.events || [];
+    // Fetch games from Firestore for consistency
+    const gamesSnapshot = await adminDb
+      .collection('games')
+      .where('week', '==', parseInt(week))
+      .where('year', '==', parseInt(year))
+      .get();
     
-    const { normalizeESPNGame } = await import("@/lib/espn-data");
-    const gameIds = new Set(
-      rawGames.map((event: Record<string, unknown>) => {
-        try {
-          const game = normalizeESPNGame(event as never);
-          return game.eventId;
-        } catch {
-          return null;
-        }
-      }).filter(Boolean)
-    );
+    const gameIds = new Set(gamesSnapshot.docs.map(doc => doc.id));
 
     // Get all users
     const usersSnapshot = await adminDb.collection("users").get();

@@ -9,6 +9,9 @@
 
 import {setGlobalOptions} from "firebase-functions";
 import { onGameComplete } from "./scheduled-stats-update";
+import { updateGameScores } from "./scheduled-game-update";
+import { updateScoresNow } from "./manual-game-update";
+import { updateGamesByWeek } from "./http-game-update";
 
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
@@ -26,4 +29,4 @@ import { onGameComplete } from "./scheduled-stats-update";
 setGlobalOptions({ maxInstances: 10 });
 
 // Export the game completion function
-export { onGameComplete };
+export { onGameComplete, updateGameScores, updateScoresNow };
