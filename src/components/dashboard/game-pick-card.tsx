@@ -114,7 +114,10 @@ export function GamePickCard({
               />
             ) : (
               <div className="h-10 w-10 flex items-center justify-center bg-muted rounded-full">
-                <span className="text-xs font-bold">{game.away.abbreviation || game.away.name.substring(0, 3).toUpperCase()}</span>
+                <span className="text-xs font-bold">
+                  {game.away.abbreviation ||
+                    game.away.name.substring(0, 3).toUpperCase()}
+                </span>
               </div>
             )}
             <div className="flex flex-col items-center gap-0.5">
@@ -147,7 +150,10 @@ export function GamePickCard({
                     {isGameFinal && pick.result && (
                       <div className="absolute -top-1 -right-1 bg-background rounded-full">
                         {pick.result === "win" ? (
-                          <Check className="h-3 w-3 text-green-600" strokeWidth={3} />
+                          <Check
+                            className="h-3 w-3 text-green-600"
+                            strokeWidth={3}
+                          />
                         ) : (
                           <X className="h-3 w-3 text-red-600" strokeWidth={3} />
                         )}
@@ -220,7 +226,10 @@ export function GamePickCard({
               />
             ) : (
               <div className="h-10 w-10 flex items-center justify-center bg-muted rounded-full">
-                <span className="text-xs font-bold">{game.home.abbreviation || game.home.name.substring(0, 3).toUpperCase()}</span>
+                <span className="text-xs font-bold">
+                  {game.home.abbreviation ||
+                    game.home.name.substring(0, 3).toUpperCase()}
+                </span>
               </div>
             )}
             <div className="flex flex-col items-center gap-0.5">
@@ -253,7 +262,10 @@ export function GamePickCard({
                     {isGameFinal && pick.result && (
                       <div className="absolute -top-1 -right-1 bg-background rounded-full">
                         {pick.result === "win" ? (
-                          <Check className="h-3 w-3 text-green-600" strokeWidth={3} />
+                          <Check
+                            className="h-3 w-3 text-green-600"
+                            strokeWidth={3}
+                          />
                         ) : (
                           <X className="h-3 w-3 text-red-600" strokeWidth={3} />
                         )}

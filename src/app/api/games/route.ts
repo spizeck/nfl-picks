@@ -4,13 +4,15 @@ import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
 import { shouldUpdateScores, markScoresUpdated } from "@/lib/espn-cache";
 import { Timestamp } from "firebase-admin/firestore";
 
-const ESPN_API_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
+const ESPN_API_URL =
+  "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const week = searchParams.get("week");
-    const year = searchParams.get("year") || new Date().getFullYear().toString();
+    const year =
+      searchParams.get("year") || new Date().getFullYear().toString();
     const refreshScores = searchParams.get("refreshScores") === "true";
 
     if (!week) {
@@ -41,24 +43,28 @@ export async function GET(request: NextRequest) {
       if (data.lastUpdated && data.lastUpdated.toDate) {
         data.lastUpdated = data.lastUpdated.toDate().toISOString();
       }
-      
+
       // Ensure data matches NormalizedGame interface
       // Handle both old format (eventId) and new format (id)
       if (!data.eventId && data.id) {
         data.eventId = data.id;
       }
-      
+
       // Ensure status has the correct structure
-      if (data.status && typeof data.status === 'string') {
+      if (data.status && typeof data.status === "string") {
         // Convert old string status to new object format
-        const statusState = data.status === 'post' ? 'post' : data.status === 'in' ? 'in' : 'pre';
+        const statusState =
+          data.status === "post" ? "post" : data.status === "in" ? "in" : "pre";
         data.status = {
           state: statusState,
           displayText: data.status,
-          detail: data.away && data.home ? `${data.away.score || 0}–${data.home.score || 0}` : undefined
+          detail:
+            data.away && data.home
+              ? `${data.away.score || 0}–${data.home.score || 0}`
+              : undefined,
         };
       }
-      
+
       return data;
     });
 
@@ -114,13 +120,17 @@ async function fetchFromESPN(year: number, week: number) {
         return normalizeESPNGame(event as never);
       } catch (error) {
         console.error(
-          `Error normalizing event ${(event as { id?: string }).id || "unknown"}:`,
+          `Error normalizing event ${
+            (event as { id?: string }).id || "unknown"
+          }:`,
           error
         );
         return null;
       }
     })
-    .filter((game: NormalizedGame | null): game is NormalizedGame => game !== null);
+    .filter(
+      (game: NormalizedGame | null): game is NormalizedGame => game !== null
+    );
   return NextResponse.json(normalized);
 }
 
