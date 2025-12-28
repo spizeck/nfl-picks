@@ -10,8 +10,7 @@
 import {setGlobalOptions} from "firebase-functions";
 import { onGameComplete } from "./scheduled-stats-update";
 import { updateGameScores } from "./scheduled-game-update";
-import { runMigrationHttp } from "./run-migration-http";
 
 setGlobalOptions({ maxInstances: 10 });
 
-export { onGameComplete, updateGameScores, runMigrationHttp };
+export { onGameComplete, updateGameScores };

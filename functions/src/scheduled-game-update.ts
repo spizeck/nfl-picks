@@ -21,7 +21,6 @@ export const updateGameScores = onSchedule(
     console.log("Starting scheduled game score update");
     
     const db = admin.firestore();
-    const currentYear = 2024; // Hardcode to 2024 for current NFL season
     
     try {
       // Get current week number
@@ -42,8 +41,9 @@ export const updateGameScores = onSchedule(
         }
       }
       
-      // Fetch data from ESPN API
-      const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}&year=${currentYear}`;
+      // Fetch data from ESPN API - use current year to get season info
+      const currentCalendarYear = new Date().getFullYear();
+      const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}&year=${currentCalendarYear}`;
       console.log(`Fetching data from ESPN API: ${espnUrl}`);
       
       const response = await fetch(espnUrl);
@@ -53,6 +53,9 @@ export const updateGameScores = onSchedule(
       
       const data = await response.json();
       const events = data.events || [];
+      
+      // Extract season year from API response
+      const currentYear = data.season?.year || data.leagues?.[0]?.season?.year || currentCalendarYear;
       
       console.log(`Found ${events.length} games from ESPN API`);
       
@@ -107,7 +110,7 @@ export const updateGameScores = onSchedule(
               status: {
                 state: normalizedGame.status.state,
                 displayText: normalizedGame.status.displayText,
-                detail: normalizedGame.status.detail,
+                ...(normalizedGame.status.detail !== undefined && { detail: normalizedGame.status.detail }),
               },
               week: currentWeek,
               year: currentYear,
@@ -152,7 +155,12 @@ export const updateGameScores = onSchedule(
  */
 function getCurrentNFLWeek(): number {
   const now = new Date();
-  const startDate = new Date(2024, 8, 1); // September 1st, 2024
+  const currentYear = now.getFullYear();
+  
+  // NFL season typically starts in early September
+  // Use current year if we're past August, otherwise previous year
+  const seasonYear = now.getMonth() >= 7 ? currentYear : currentYear - 1;
+  const startDate = new Date(seasonYear, 8, 1); // September 1st of season year
   
   // Calculate weeks since start of season
   const diffTime = Math.abs(now.getTime() - startDate.getTime());
