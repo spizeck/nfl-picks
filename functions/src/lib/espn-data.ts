@@ -150,12 +150,15 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
  * Format game time for pre-game display
  */
 function formatGameTime(date: Date): string {
+  // Format in UTC since the date from ESPN is already in UTC
+  // The frontend will handle timezone conversion
   return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "UTC"
   });
 }
 

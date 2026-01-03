@@ -37,6 +37,21 @@ export function GamePickCard({
   const now = new Date();
   const hasGameStarted = gameStartTime <= now;
 
+  // Format the display time in user's local timezone
+  const formatLocalTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  // Get the local time for display
+  const localDisplayTime = !isGameFinal && !isGameLive ? formatLocalTime(game.date) : game.status.displayText;
+
   const awayPicks = hasGameStarted
     ? userPicks.filter((p) => p.selectedTeam === game.away.id)
     : [];
@@ -195,7 +210,7 @@ export function GamePickCard({
             </>
           ) : (
             <p className="text-xs text-muted-foreground text-center">
-              {game.status.displayText}
+              {localDisplayTime}
             </p>
           )}
         </div>
