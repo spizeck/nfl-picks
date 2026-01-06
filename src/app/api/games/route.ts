@@ -106,7 +106,14 @@ export async function GET(request: NextRequest) {
 }
 
 async function fetchFromESPN(year: number, week: number) {
-  const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
+  // Map our week numbers back to ESPN's format for the API call
+  let espnWeekNumber = week;
+  if (week > 18) {
+    // Map back: 19->1, 20->2, 21->3, 22->4
+    espnWeekNumber = week - 18;
+  }
+  
+  const espnUrl = `${ESPN_API_URL}?week=${espnWeekNumber}&year=${year}`;
   const response = await fetch(espnUrl);
 
   if (!response.ok) {
@@ -155,7 +162,14 @@ async function updateActiveGameScores(
 
   console.log(`Found ${activeGamesSnapshot.size} active games to update`);
 
-  const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
+  // Map our week numbers back to ESPN's format for the API call
+  let espnWeekNumber = week;
+  if (week > 18) {
+    // Map back: 19->1, 20->2, 21->3, 22->4
+    espnWeekNumber = week - 18;
+  }
+  
+  const espnUrl = `${ESPN_API_URL}?week=${espnWeekNumber}&year=${year}`;
   const response = await fetch(espnUrl);
 
   if (!response.ok) {

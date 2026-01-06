@@ -14,8 +14,15 @@ export async function GET() {
     const data = await response.json();
     
     // ESPN returns the current week in the response
-    const currentWeek = data.week?.number || 1;
+    let currentWeek = data.week?.number || 1;
     const seasonType = data.season?.type || 2; // 1=preseason, 2=regular, 3=postseason
+    
+    // For postseason, we need to map ESPN's week numbers to our system
+    if (seasonType === 3) {
+      // ESPN's postseason weeks start at 1, but we use 19-22
+      // Map: 1->19 (Wild Card), 2->20 (Divisional), 3->21 (Conference), 4->22 (Super Bowl)
+      currentWeek = currentWeek + 18;
+    }
     
     return NextResponse.json({ 
       week: currentWeek,

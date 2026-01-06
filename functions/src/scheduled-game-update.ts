@@ -35,15 +35,22 @@ export const updateGameScores = onSchedule(
       }
       
       const weekInfoData = await weekInfoResponse.json();
-      const currentWeek = weekInfoData.week?.number || getCurrentNFLWeekFallback();
+      let currentWeek = weekInfoData.week?.number || getCurrentNFLWeekFallback();
       const currentYear = weekInfoData.season?.year || currentCalendarYear;
       const seasonType = weekInfoData.season?.type || 2;
       
+      // For postseason, we need to map ESPN's week numbers to our system
+      if (seasonType === 3) {
+        // ESPN's postseason weeks start at 1, but we use 19-22
+        // Map: 1->19 (Wild Card), 2->20 (Divisional), 3->21 (Conference), 4->22 (Super Bowl)
+        currentWeek = currentWeek + 18;
+      }
+      
       console.log(`Current NFL week: ${currentWeek}, year: ${currentYear}, season type: ${seasonType}`);
       
-      // Skip if we're in preseason or postseason
-      if (seasonType !== 2) {
-        console.log(`Not in regular season (type: ${seasonType}), skipping update`);
+      // Allow both regular season and postseason
+      if (seasonType !== 2 && seasonType !== 3) {
+        console.log(`Not in regular or postseason (type: ${seasonType}), skipping update`);
         return;
       }
       
@@ -63,7 +70,14 @@ export const updateGameScores = onSchedule(
       }
       
       // Fetch actual game data from ESPN API
-      const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}&year=${currentYear}`;
+      // Map our week numbers back to ESPN's format for the API call
+      let espnWeekNumber = currentWeek;
+      if (seasonType === 3 && currentWeek > 18) {
+        // Map back: 19->1, 20->2, 21->3, 22->4
+        espnWeekNumber = currentWeek - 18;
+      }
+      
+      const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${espnWeekNumber}&year=${currentYear}`;
       console.log(`Fetching game data from ESPN API: ${espnUrl}`);
       
       const response = await fetch(espnUrl);
@@ -182,7 +196,17 @@ function getCurrentNFLWeekFallback(): number {
   const diffTime = Math.abs(now.getTime() - startDate.getTime());
   const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
   
-  // Ensure week is between 1 and 18
+  // Handle postseason weeks (Wild Card is week 19, Divisional is week 20, etc.)
+  // Regular season is 18 weeks, then postseason starts
+  if (diffWeeks > 18) {
+    // Return appropriate postseason week number
+    if (diffWeeks === 19) return 1; // Wild Card week
+    if (diffWeeks === 20) return 2; // Divisional week
+    if (diffWeeks === 21) return 3; // Conference championship
+    if (diffWeeks === 22) return 4; // Super Bowl
+  }
+  
+  // Ensure week is between 1 and 18 for regular season
   return Math.min(Math.max(diffWeeks, 1), 18);
 }
 
