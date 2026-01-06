@@ -39,11 +39,18 @@ export const updateGameScores = onSchedule(
       const currentYear = weekInfoData.season?.year || currentCalendarYear;
       const seasonType = weekInfoData.season?.type || 2;
       
-      // For postseason, we need to map ESPN's week numbers to our system
-      if (seasonType === 3) {
-        // ESPN's postseason weeks start at 1, but we use 19-22
-        // Map: 1->19 (Wild Card), 2->20 (Divisional), 3->21 (Conference), 4->22 (Super Bowl)
-        currentWeek = currentWeek + 18;
+      // Check if we're actually in postseason based on date
+      const now = new Date();
+      const january = now.getMonth() === 0; // January
+      
+      // If it's January 2025, we're in postseason
+      if (january && currentYear === 2025) {
+        // Determine which postseason week based on date
+        const date = now.getDate();
+        if (date <= 7) currentWeek = 19; // Wild Card
+        else if (date <= 14) currentWeek = 20; // Divisional
+        else if (date <= 21) currentWeek = 21; // Conference
+        else currentWeek = 22; // Super Bowl
       }
       
       console.log(`Current NFL week: ${currentWeek}, year: ${currentYear}, season type: ${seasonType}`);
@@ -70,14 +77,9 @@ export const updateGameScores = onSchedule(
       }
       
       // Fetch actual game data from ESPN API
-      // Map our week numbers back to ESPN's format for the API call
-      let espnWeekNumber = currentWeek;
-      if (seasonType === 3 && currentWeek > 18) {
-        // Map back: 19->1, 20->2, 21->3, 22->4
-        espnWeekNumber = currentWeek - 18;
-      }
-      
-      const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${espnWeekNumber}&year=${currentYear}`;
+      // For ESPN API, we use the week number directly
+      // ESPN appears to use the same week numbers (19-22) for postseason
+      const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}&year=${currentYear}`;
       console.log(`Fetching game data from ESPN API: ${espnUrl}`);
       
       const response = await fetch(espnUrl);

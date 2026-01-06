@@ -19,6 +19,298 @@ A Next.js application for making NFL game picks and tracking your record against
 - **Database**: Firestore
 - **API**: ESPN API for NFL game data
 
+## APIs and Data Flow
+
+### 1. ESPN API Integration
+
+#### Endpoint Used
+```
+https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard
+```
+
+#### Query Parameters
+- `week`: NFL week number (1-18 for regular season, 19-22 for postseason)
+- `year`: Season year (e.g., 2025)
+- `seasontype`: Optional (1=preseason, 2=regular, 3=postseason)
+
+#### Example Request
+```javascript
+const response = await fetch(
+  'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=1&year=2025'
+);
+```
+
+#### ESPN API Response Structure
+```json
+{
+  "leagues": [{
+    "events": [
+      {
+        "id": "401437678",
+        "name": "Houston Texans at Buffalo Bills",
+        "date": "2025-09-04T23:15Z",
+        "competitions": [{
+          "competitors": [
+            {
+              "team": {
+                "id": "33",
+                "displayName": "Houston Texans",
+                "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/33.png"
+              },
+              "score": 20,
+              "homeAway": "away"
+            },
+            {
+              "team": {
+                "id": "13",
+                "displayName": "Buffalo Bills",
+                "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/13.png"
+              },
+              "score": 24,
+              "homeAway": "home"
+            }
+          ]
+        }],
+        "status": {
+          "type": {
+            "state": "post",
+            "completed": true,
+            "description": "Final"
+          }
+        }
+      }
+    ]
+  }]
+}
+```
+
+### 2. Data Normalization
+
+Since ESPN's API response has a complex nested structure, we normalize it into a simpler format:
+
+#### Normalized Game Interface
+```typescript
+interface NormalizedGame {
+  eventId: string;
+  date: string;
+  away: {
+    id: string;
+    name: string;
+    logo: string;
+    abbreviation?: string;
+    record?: string;
+    score?: number;
+  };
+  home: {
+    id: string;
+    name: string;
+    logo: string;
+    abbreviation?: string;
+    record?: string;
+    score?: number;
+  };
+  status: {
+    state: "pre" | "in" | "post";
+    displayText: string;
+    detail?: string;
+  };
+}
+```
+
+#### Normalized Example
+```json
+{
+  "eventId": "401437678",
+  "date": "2025-09-04T23:15Z",
+  "away": {
+    "id": "33",
+    "name": "Houston Texans",
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/33.png",
+    "abbreviation": "HOU",
+    "record": "10-7",
+    "score": 20
+  },
+  "home": {
+    "id": "13",
+    "name": "Buffalo Bills",
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/13.png",
+    "abbreviation": "BUF",
+    "record": "11-6",
+    "score": 24
+  },
+  "status": {
+    "state": "post",
+    "displayText": "Final",
+    "detail": "20-24"
+  }
+}
+```
+
+### 3. Internal API Routes
+
+#### `/api/games`
+Fetches games for a specific week and year. Handles both fetching from ESPN API and caching in Firestore.
+
+**Query Parameters:**
+- `week` (required): Week number
+- `year` (optional): Season year (defaults to current year)
+- `refreshScores` (optional): Set to "true" to force refresh from ESPN
+
+**Response:** Array of `NormalizedGame` objects
+
+#### `/api/current-week`
+Returns the current NFL week number based on ESPN's API.
+
+**Response:**
+```json
+{
+  "week": 1,
+  "year": 2025,
+  "seasonType": 2
+}
+```
+
+#### `/api/user-picks`
+Manages user's game picks.
+
+**GET:** Returns user's picks for a week
+**POST:** Saves new picks
+
+Request/Response format:
+```json
+{
+  "gameId": "401437678",
+  "selectedTeam": "33",
+  "week": 1,
+  "year": 2025,
+  "timestamp": {
+    "seconds": 1725494400,
+    "nanoseconds": 0
+  }
+}
+```
+
+#### `/api/all-picks`
+Returns all users' picks for a week (used for displaying what others picked).
+
+### 4. Data Storage in Firestore
+
+#### Collections Structure
+
+**games** collection:
+- Document ID: ESPN event ID
+- Fields: Normalized game data plus `week`, `year`, and `lastUpdated` timestamps
+
+**users** collection:
+- Document ID: Firebase auth UID
+- Fields: User profile information
+
+**picks** collection:
+- Document ID: Auto-generated
+- Fields: User pick data with indexes on userId, week, and year
+
+#### Example Game Document
+```json
+{
+  "eventId": "401437678",
+  "date": "2025-09-04T23:15Z",
+  "away": {
+    "id": "33",
+    "name": "Houston Texans",
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/33.png",
+    "score": 20
+  },
+  "home": {
+    "id": "13",
+    "name": "Buffalo Bills",
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/13.png",
+    "score": 24
+  },
+  "status": {
+    "state": "post",
+    "displayText": "Final",
+    "detail": "20-24"
+  },
+  "week": 1,
+  "year": 2025,
+  "lastUpdated": "2025-01-05T20:30:00Z"
+}
+```
+
+### 5. Scheduled Updates
+
+Firebase Cloud Functions run every 5 minutes to:
+1. Check ESPN API for score updates
+2. Update active games in Firestore
+3. Only updates games that are in progress or about to start
+
+#### Cloud Functions
+
+**`updateGameScores`** (Scheduled every 5 minutes)
+- Fetches current week from ESPN API
+- Updates all active/pre-game scores in Firestore
+- Includes rate limiting to avoid excessive API calls
+
+**`forceUpdateWeek`** (Callable function)
+- Manually trigger update for specific week
+- Used for testing or immediate updates
+- Accepts `week` and `year` parameters
+
+**`onGameComplete`** (Firestore trigger)
+- Automatically processes completed games
+- Updates user pick records (win/loss)
+- Calculates weekly standings
+
+**`processCompletedGames`** (HTTP trigger)
+- Batch processes multiple completed games
+- Updates leaderboards and statistics
+
+### 6. Postseason Handling
+
+Since ESPN's API may not have postseason data immediately, the app includes mock data for playoff weeks:
+- Week 19: Wild Card Weekend
+- Week 20: Divisional Round
+- Week 21: Conference Championships
+- Week 22: Super Bowl
+
+The app automatically detects postseason based on date and uses mock data until ESPN updates their API.
+
+### 7. Error Handling
+
+- If ESPN API fails, the app falls back to cached data in Firestore
+- If no cached data exists, shows an error message
+- Rate limiting prevents excessive calls to ESPN API
+- Automatic retries with exponential backoff for network errors
+
+### 8. Frontend Data Usage
+
+#### Dashboard Component
+The main dashboard (`src/components/dashboard/dashboard.tsx`) consumes the APIs:
+
+1. **Fetches current week** on mount to determine which week to display
+2. **Loads games** for the selected week via `/api/games`
+3. **Loads user's existing picks** via `/api/user-picks`
+4. **Loads all users' picks** via `/api/all-picks` for social features
+
+#### Game Display
+Each game is rendered using the `GamePickCard` component:
+- Shows team logos, names, and records
+- Displays current score or game time based on status
+- Allows picking winners before game starts
+- Shows results after games complete
+- Displays what other users picked (after game starts)
+
+#### Week Selection
+The `WeekDropdown` component provides:
+- Regular season weeks 1-18
+- Postseason weeks 19-22 with labels (Wild Card, Divisional, etc.)
+- Automatic navigation to current week on load
+
+#### Real-time Updates
+- Scores refresh every 30 seconds for active games
+- Status updates (pre -> in -> post) trigger UI changes
+- Pick buttons disable when games start
+
 ## Setup Instructions
 
 ### 1. Clone and Install Dependencies
@@ -94,18 +386,32 @@ nfl-picks/
 ├── src/
 │   ├── app/                 # Next.js App Router
 │   │   ├── api/            # API routes
-│   │   │   ├── nfl-games/  # ESPN API integration
-│   │   │   └── user-picks/ # Pick management
+│   │   │   ├── games/      # Game data fetching and caching
+│   │   │   ├── current-week/ # Current week detection
+│   │   │   ├── user-picks/ # User pick management
+│   │   │   └── all-picks/  # All users' picks for social features
 │   │   ├── layout.tsx      # Root layout with providers
-│   │   └── page.tsx        # Main page
+│   │   └── page.tsx        # Main page (authentication)
 │   ├── components/         # React components
 │   │   ├── auth/          # Authentication components
-│   │   ├── games/         # Game display components
-│   │   └── providers.tsx  # Chakra UI provider
+│   │   ├── dashboard/     # Main dashboard and game cards
+│   │   ├── layout/        # Layout components (week dropdown)
+│   │   └── ui/            # Reusable UI components
 │   └── lib/               # Utility files
 │       ├── firebase.ts    # Client-side Firebase config
-│       └── firebase-admin.ts # Server-side Firebase config
+│       ├── firebase-admin.ts # Server-side Firebase config
+│       ├── espn-data.ts   # ESPN API data normalization
+│       ├── espn-cache.ts  # Caching utilities
+│       └── mock-postseason-data.ts # Temporary playoff data
+├── functions/             # Firebase Cloud Functions
+│   ├── src/
+│   │   ├── index.ts       # Function exports
+│   │   ├── scheduled-game-update.ts # Automated score updates
+│   │   ├── force-update.ts # Manual update trigger
+│   │   └── lib/           # Shared utilities
+│   └── package.json
 ├── public/               # Static assets
+├── firebase.json         # Firebase configuration
 └── package.json         # Dependencies
 ```
 

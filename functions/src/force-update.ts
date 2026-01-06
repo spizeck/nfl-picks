@@ -24,7 +24,8 @@ export const forceUpdateWeek = onCall(async (request) => {
   const db = admin.firestore();
   
   try {
-    // Fetch game data from ESPN API
+    // For ESPN API, we use the week number directly
+    // ESPN appears to use the same week numbers (19-22) for postseason
     const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&year=${year}`;
     console.log(`Fetching week ${week} game data from ESPN API: ${espnUrl}`);
     

@@ -17,16 +17,24 @@ export async function GET() {
     let currentWeek = data.week?.number || 1;
     const seasonType = data.season?.type || 2; // 1=preseason, 2=regular, 3=postseason
     
-    // For postseason, we need to map ESPN's week numbers to our system
-    if (seasonType === 3) {
-      // ESPN's postseason weeks start at 1, but we use 19-22
-      // Map: 1->19 (Wild Card), 2->20 (Divisional), 3->21 (Conference), 4->22 (Super Bowl)
-      currentWeek = currentWeek + 18;
+    // Check if we're actually in postseason based on date
+    const now = new Date();
+    const january = now.getMonth() === 0; // January
+    const actualYear = now.getFullYear();
+    
+    // If it's January 2025, we're in postseason
+    if (january && actualYear === 2025) {
+      // Determine which postseason week based on date
+      const date = now.getDate();
+      if (date <= 7) currentWeek = 19; // Wild Card
+      else if (date <= 14) currentWeek = 20; // Divisional
+      else if (date <= 21) currentWeek = 21; // Conference
+      else currentWeek = 22; // Super Bowl
     }
     
     return NextResponse.json({ 
       week: currentWeek,
-      year: currentYear,
+      year: actualYear,
       seasonType 
     });
   } catch (error) {

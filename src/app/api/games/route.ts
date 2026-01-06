@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
 import { shouldUpdateScores, markScoresUpdated } from "@/lib/espn-cache";
 import { Timestamp } from "firebase-admin/firestore";
+import { MOCK_POSTSEASON_GAMES } from "@/lib/mock-postseason-data";
 
 const ESPN_API_URL =
   "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
@@ -106,14 +107,15 @@ export async function GET(request: NextRequest) {
 }
 
 async function fetchFromESPN(year: number, week: number) {
-  // Map our week numbers back to ESPN's format for the API call
-  let espnWeekNumber = week;
-  if (week > 18) {
-    // Map back: 19->1, 20->2, 21->3, 22->4
-    espnWeekNumber = week - 18;
+  // Check if this is a postseason week (19-22) and use mock data
+  if (week >= 19 && week <= 22 && year === 2025) {
+    console.log(`Using mock data for postseason week ${week}`);
+    return NextResponse.json(MOCK_POSTSEASON_GAMES[week as keyof typeof MOCK_POSTSEASON_GAMES] || []);
   }
   
-  const espnUrl = `${ESPN_API_URL}?week=${espnWeekNumber}&year=${year}`;
+  // For ESPN API, we use the week number directly
+  // ESPN appears to use the same week numbers (19-22) for postseason
+  const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
   const response = await fetch(espnUrl);
 
   if (!response.ok) {
@@ -162,14 +164,9 @@ async function updateActiveGameScores(
 
   console.log(`Found ${activeGamesSnapshot.size} active games to update`);
 
-  // Map our week numbers back to ESPN's format for the API call
-  let espnWeekNumber = week;
-  if (week > 18) {
-    // Map back: 19->1, 20->2, 21->3, 22->4
-    espnWeekNumber = week - 18;
-  }
-  
-  const espnUrl = `${ESPN_API_URL}?week=${espnWeekNumber}&year=${year}`;
+  // For ESPN API, we use the week number directly
+  // ESPN appears to use the same week numbers (19-22) for postseason
+  const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
   const response = await fetch(espnUrl);
 
   if (!response.ok) {
