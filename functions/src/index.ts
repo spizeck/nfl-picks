@@ -12,7 +12,8 @@ import { onGameComplete } from "./scheduled-stats-update";
 import { updateGameScores } from "./scheduled-game-update";
 import { forceUpdateWeek } from "./force-update";
 import { processCompletedGames } from "./process-completed-games";
+import { fixPostseasonWeeks } from "./fix-postseason-weeks";
 
 setGlobalOptions({ maxInstances: 10 });
 
-export { onGameComplete, updateGameScores, forceUpdateWeek, processCompletedGames };
+export { onGameComplete, updateGameScores, forceUpdateWeek, processCompletedGames, fixPostseasonWeeks };

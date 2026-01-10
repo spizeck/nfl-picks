@@ -29,12 +29,11 @@ export async function GET() {
       // Determine which postseason week based on date
       const date = now.getDate();
       if (month === 0) { // January
-        if (date <= 7) currentWeek = 19; // Wild Card
-        else if (date <= 14) currentWeek = 20; // Divisional
-        else if (date <= 21) currentWeek = 21; // Conference
-        else currentWeek = 22; // Super Bowl
-      } else if (month === 1 && date <= 14) { // February (Super Bowl)
-        currentWeek = 22;
+        if (date <= 17) currentWeek = 19; // Wild Card (Jan 11-13)
+        else if (date <= 24) currentWeek = 20; // Divisional (Jan 18-19)
+        else currentWeek = 21; // Conference Championship (Jan 26)
+      } else if (month === 1) { // February
+        currentWeek = 22; // Super Bowl (early Feb)
       }
     }
     
