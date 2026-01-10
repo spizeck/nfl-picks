@@ -19,22 +19,28 @@ export async function GET() {
     
     // Check if we're actually in postseason based on date
     const now = new Date();
-    const january = now.getMonth() === 0; // January
-    const actualYear = now.getFullYear();
+    const month = now.getMonth(); // 0 = January, 1 = February
+    const calendarYear = now.getFullYear();
+    const seasonYear = data.season?.year || currentYear;
     
-    // If it's January 2025, we're in postseason
-    if (january && actualYear === 2025) {
+    // Postseason runs from early January through early February
+    // If we're in January/February and the season year is the previous calendar year, we're in postseason
+    if ((month === 0 || month === 1) && seasonYear === calendarYear - 1) {
       // Determine which postseason week based on date
       const date = now.getDate();
-      if (date <= 7) currentWeek = 19; // Wild Card
-      else if (date <= 14) currentWeek = 20; // Divisional
-      else if (date <= 21) currentWeek = 21; // Conference
-      else currentWeek = 22; // Super Bowl
+      if (month === 0) { // January
+        if (date <= 7) currentWeek = 19; // Wild Card
+        else if (date <= 14) currentWeek = 20; // Divisional
+        else if (date <= 21) currentWeek = 21; // Conference
+        else currentWeek = 22; // Super Bowl
+      } else if (month === 1 && date <= 14) { // February (Super Bowl)
+        currentWeek = 22;
+      }
     }
     
     return NextResponse.json({ 
       week: currentWeek,
-      year: actualYear,
+      year: seasonYear,
       seasonType 
     });
   } catch (error) {

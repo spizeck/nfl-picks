@@ -41,16 +41,22 @@ export const updateGameScores = onSchedule(
       
       // Check if we're actually in postseason based on date
       const now = new Date();
-      const january = now.getMonth() === 0; // January
+      const month = now.getMonth(); // 0 = January, 1 = February
+      const calendarYear = now.getFullYear();
       
-      // If it's January 2025, we're in postseason
-      if (january && currentYear === 2025) {
+      // Postseason runs from early January through early February
+      // If we're in January/February and the season year is the previous calendar year, we're in postseason
+      if ((month === 0 || month === 1) && currentYear === calendarYear - 1) {
         // Determine which postseason week based on date
         const date = now.getDate();
-        if (date <= 7) currentWeek = 19; // Wild Card
-        else if (date <= 14) currentWeek = 20; // Divisional
-        else if (date <= 21) currentWeek = 21; // Conference
-        else currentWeek = 22; // Super Bowl
+        if (month === 0) { // January
+          if (date <= 7) currentWeek = 19; // Wild Card
+          else if (date <= 14) currentWeek = 20; // Divisional
+          else if (date <= 21) currentWeek = 21; // Conference
+          else currentWeek = 22; // Super Bowl
+        } else if (month === 1 && date <= 14) { // February (Super Bowl)
+          currentWeek = 22;
+        }
       }
       
       console.log(`Current NFL week: ${currentWeek}, year: ${currentYear}, season type: ${seasonType}`);
@@ -202,10 +208,10 @@ function getCurrentNFLWeekFallback(): number {
   // Regular season is 18 weeks, then postseason starts
   if (diffWeeks > 18) {
     // Return appropriate postseason week number
-    if (diffWeeks === 19) return 1; // Wild Card week
-    if (diffWeeks === 20) return 2; // Divisional week
-    if (diffWeeks === 21) return 3; // Conference championship
-    if (diffWeeks === 22) return 4; // Super Bowl
+    if (diffWeeks === 19) return 19; // Wild Card week
+    if (diffWeeks === 20) return 20; // Divisional week
+    if (diffWeeks === 21) return 21; // Conference championship
+    if (diffWeeks === 22) return 22; // Super Bowl
   }
   
   // Ensure week is between 1 and 18 for regular season
