@@ -16,25 +16,17 @@ export async function GET() {
     // ESPN returns the current week in the response
     let currentWeek = data.week?.number || 1;
     const seasonType = data.season?.type || 2; // 1=preseason, 2=regular, 3=postseason
-    
-    // Check if we're actually in postseason based on date
-    const now = new Date();
-    const month = now.getMonth(); // 0 = January, 1 = February
-    const calendarYear = now.getFullYear();
     const seasonYear = data.season?.year || currentYear;
     
-    // Postseason runs from early January through early February
-    // If we're in January/February and the season year is the previous calendar year, we're in postseason
-    if ((month === 0 || month === 1) && seasonYear === calendarYear - 1) {
-      // Determine which postseason week based on date
-      const date = now.getDate();
-      if (month === 0) { // January
-        if (date <= 17) currentWeek = 19; // Wild Card (Jan 11-13)
-        else if (date <= 24) currentWeek = 20; // Divisional (Jan 18-19)
-        else currentWeek = 21; // Conference Championship (Jan 26)
-      } else if (month === 1) { // February
-        currentWeek = 22; // Super Bowl (early Feb)
-      }
+    // ESPN uses seasontype=3 with weeks 1-5 for postseason, but we use 19-22 internally
+    // Convert ESPN's postseason weeks to our internal numbering
+    if (seasonType === 3) {
+      // Postseason: ESPN weeks map to our internal weeks
+      if (currentWeek === 1) currentWeek = 19; // Wild Card
+      else if (currentWeek === 2) currentWeek = 20; // Divisional
+      else if (currentWeek === 3) currentWeek = 21; // Conference Championships
+      else if (currentWeek === 5) currentWeek = 22; // Super Bowl (week 4 is Pro Bowl, skip it)
+      else if (currentWeek === 4) currentWeek = 21; // Pro Bowl - treat as Conference week for now
     }
     
     return NextResponse.json({ 

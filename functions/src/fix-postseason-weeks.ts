@@ -20,39 +20,57 @@ export const fixPostseasonWeeks = onRequest(
     const db = admin.firestore();
     
     try {
-      // Find all games from 2024 season with week 1-4 that are actually postseason games
-      // Postseason games happen in January 2025, so we can identify them by date
-      const gamesSnapshot = await db
+      // First, let's check what games exist in January/February 2025
+      const allGamesSnapshot = await db
         .collection("games")
-        .where("year", "==", 2024)
-        .where("week", "in", [1, 2, 3, 4])
         .get();
       
-      console.log(`Found ${gamesSnapshot.size} games to check`);
+      console.log(`Total games in database: ${allGamesSnapshot.size}`);
+      
+      const januaryGames = allGamesSnapshot.docs.filter(doc => {
+        const game = doc.data();
+        const gameDate = new Date(game.date);
+        const gameMonth = gameDate.getMonth();
+        const gameYear = gameDate.getFullYear();
+        return (gameMonth === 0 || gameMonth === 1) && gameYear === 2025;
+      });
+      
+      console.log(`Games in Jan/Feb 2025: ${januaryGames.length}`);
+      
+      // Log details about these games
+      januaryGames.forEach(doc => {
+        const game = doc.data();
+        console.log(`Game ${doc.id}: week=${game.week}, year=${game.year}, date=${game.date}`);
+      });
       
       const batch = db.batch();
       let updatedCount = 0;
       
-      for (const doc of gamesSnapshot.docs) {
+      // Fix games that have wrong week numbers
+      for (const doc of januaryGames) {
         const game = doc.data();
         const gameDate = new Date(game.date);
-        const gameMonth = gameDate.getMonth(); // 0 = January
-        const gameYear = gameDate.getFullYear();
+        const gameDay = gameDate.getDate();
+        const gameMonth = gameDate.getMonth();
         
-        // If the game is in January or February 2025, it's a postseason game
-        if ((gameMonth === 0 || gameMonth === 1) && gameYear === 2025) {
-          let correctWeek = game.week;
-          
-          // Map old week numbers to correct postseason week numbers
-          if (game.week === 1) correctWeek = 19; // Wild Card
-          else if (game.week === 2) correctWeek = 20; // Divisional
-          else if (game.week === 3) correctWeek = 21; // Conference
-          else if (game.week === 4) correctWeek = 22; // Super Bowl
-          
+        let correctWeek = game.week;
+        
+        // Determine correct week based on date
+        if (gameMonth === 0) { // January
+          if (gameDay <= 17) correctWeek = 19; // Wild Card
+          else if (gameDay <= 24) correctWeek = 20; // Divisional
+          else correctWeek = 21; // Conference
+        } else if (gameMonth === 1) { // February
+          correctWeek = 22; // Super Bowl
+        }
+        
+        // Only update if week is wrong
+        if (game.week !== correctWeek) {
           console.log(`Updating game ${doc.id}: week ${game.week} -> ${correctWeek}, date: ${game.date}`);
           
           batch.update(doc.ref, {
             week: correctWeek,
+            year: 2024, // Ensure it's stored as 2024 season
             lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
           });
           
@@ -70,7 +88,17 @@ export const fixPostseasonWeeks = onRequest(
       res.status(200).json({
         success: true,
         message: `Updated ${updatedCount} games`,
-        checked: gamesSnapshot.size,
+        totalGames: allGamesSnapshot.size,
+        januaryGames: januaryGames.length,
+        gamesChecked: januaryGames.map(doc => {
+          const game = doc.data();
+          return {
+            id: doc.id,
+            week: game.week,
+            year: game.year,
+            date: game.date,
+          };
+        }),
       });
     } catch (error) {
       console.error("Error fixing postseason weeks:", error);

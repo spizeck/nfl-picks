@@ -39,23 +39,18 @@ export const updateGameScores = onSchedule(
       const currentYear = weekInfoData.season?.year || currentCalendarYear;
       const seasonType = weekInfoData.season?.type || 2;
       
-      // Check if we're actually in postseason based on date
-      const now = new Date();
-      const month = now.getMonth(); // 0 = January, 1 = February
-      const calendarYear = now.getFullYear();
+      // ESPN uses seasontype=3 with weeks 1-5 for postseason, but we use 19-22 internally
+      // Store the ESPN week for API calls
+      const espnWeek = currentWeek;
       
-      // Postseason runs from early January through early February
-      // If we're in January/February and the season year is the previous calendar year, we're in postseason
-      if ((month === 0 || month === 1) && currentYear === calendarYear - 1) {
-        // Determine which postseason week based on date
-        const date = now.getDate();
-        if (month === 0) { // January
-          if (date <= 17) currentWeek = 19; // Wild Card (Jan 11-13)
-          else if (date <= 24) currentWeek = 20; // Divisional (Jan 18-19)
-          else currentWeek = 21; // Conference Championship (Jan 26)
-        } else if (month === 1) { // February
-          currentWeek = 22; // Super Bowl (early Feb)
-        }
+      // Convert ESPN's postseason weeks to our internal numbering
+      if (seasonType === 3) {
+        // Postseason: ESPN weeks map to our internal weeks
+        if (currentWeek === 1) currentWeek = 19; // Wild Card
+        else if (currentWeek === 2) currentWeek = 20; // Divisional
+        else if (currentWeek === 3) currentWeek = 21; // Conference Championships
+        else if (currentWeek === 5) currentWeek = 22; // Super Bowl
+        else if (currentWeek === 4) currentWeek = 21; // Pro Bowl - treat as Conference week
       }
       
       console.log(`Current NFL week: ${currentWeek}, year: ${currentYear}, season type: ${seasonType}`);
@@ -82,10 +77,16 @@ export const updateGameScores = onSchedule(
       }
       
       // Fetch actual game data from ESPN API
-      // For ESPN API, we use the week number directly
-      // ESPN appears to use the same week numbers (19-22) for postseason
-      const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}&year=${currentYear}`;
-      console.log(`Fetching game data from ESPN API: ${espnUrl}`);
+      // For postseason, use seasontype=3 and dates parameter with calendar year
+      let espnUrl;
+      if (seasonType === 3) {
+        const calendarYear = currentYear + 1; // Postseason games are in next calendar year
+        espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3&week=${espnWeek}&dates=${calendarYear}`;
+        console.log(`Fetching postseason game data: ${espnUrl} (ESPN week: ${espnWeek}, internal week: ${currentWeek})`);
+      } else {
+        espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}&year=${currentYear}`;
+        console.log(`Fetching regular season game data: ${espnUrl}`);
+      }
       
       const response = await fetch(espnUrl);
       if (!response.ok) {

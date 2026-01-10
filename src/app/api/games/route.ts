@@ -3,7 +3,6 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
 import { shouldUpdateScores, markScoresUpdated } from "@/lib/espn-cache";
 import { Timestamp } from "firebase-admin/firestore";
-import { MOCK_POSTSEASON_GAMES } from "@/lib/mock-postseason-data";
 
 const ESPN_API_URL =
   "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
@@ -107,15 +106,31 @@ export async function GET(request: NextRequest) {
 }
 
 async function fetchFromESPN(year: number, week: number) {
-  // Check if this is a postseason week (19-22) and use mock data
-  if (week >= 19 && week <= 22 && year === 2025) {
-    console.log(`Using mock data for postseason week ${week}`);
-    return NextResponse.json(MOCK_POSTSEASON_GAMES[week as keyof typeof MOCK_POSTSEASON_GAMES] || []);
+  // Convert internal week numbers (19-22) to ESPN postseason weeks (1-5)
+  let espnWeek = week;
+  let isPostseason = false;
+  let calendarYear = year;
+  
+  if (week >= 19 && week <= 22) {
+    isPostseason = true;
+    // Map internal weeks to ESPN postseason weeks
+    if (week === 19) espnWeek = 1; // Wild Card
+    else if (week === 20) espnWeek = 2; // Divisional
+    else if (week === 21) espnWeek = 3; // Conference Championships
+    else if (week === 22) espnWeek = 5; // Super Bowl (skip week 4 Pro Bowl)
+    
+    // Postseason games are played in the calendar year AFTER the season year
+    calendarYear = year + 1;
+    
+    console.log(`Postseason week: converting internal week ${week} to ESPN week ${espnWeek}, using calendar year ${calendarYear}`);
   }
   
-  // For ESPN API, we use the week number directly
-  // ESPN appears to use the same week numbers (19-22) for postseason
-  const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
+  // Use seasontype parameter for postseason
+  const espnUrl = isPostseason 
+    ? `${ESPN_API_URL}?seasontype=3&week=${espnWeek}&dates=${calendarYear}`
+    : `${ESPN_API_URL}?week=${espnWeek}&year=${year}`;
+  
+  console.log(`Fetching from ESPN: ${espnUrl}`);
   const response = await fetch(espnUrl);
 
   if (!response.ok) {
@@ -126,7 +141,12 @@ async function fetchFromESPN(year: number, week: number) {
   const normalized = (data.events || [])
     .map((event: unknown) => {
       try {
-        return normalizeESPNGame(event as never);
+        const game = normalizeESPNGame(event as never);
+        // For postseason games, ensure we store with internal week numbering
+        if (isPostseason && game) {
+          return { ...game, week };
+        }
+        return game;
       } catch (error) {
         console.error(
           `Error normalizing event ${
@@ -164,9 +184,27 @@ async function updateActiveGameScores(
 
   console.log(`Found ${activeGamesSnapshot.size} active games to update`);
 
-  // For ESPN API, we use the week number directly
-  // ESPN appears to use the same week numbers (19-22) for postseason
-  const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
+  // Convert internal week numbers (19-22) to ESPN postseason weeks
+  let espnWeek = week;
+  let isPostseason = false;
+  let calendarYear = year;
+  
+  if (week >= 19 && week <= 22) {
+    isPostseason = true;
+    // Map internal weeks to ESPN postseason weeks
+    if (week === 19) espnWeek = 1; // Wild Card
+    else if (week === 20) espnWeek = 2; // Divisional
+    else if (week === 21) espnWeek = 3; // Conference Championships
+    else if (week === 22) espnWeek = 5; // Super Bowl
+    
+    calendarYear = year + 1; // Postseason games are in the next calendar year
+    console.log(`Postseason: converting internal week ${week} to ESPN week ${espnWeek}, calendar year ${calendarYear}`);
+  }
+  
+  const espnUrl = isPostseason
+    ? `${ESPN_API_URL}?seasontype=3&week=${espnWeek}&dates=${calendarYear}`
+    : `${ESPN_API_URL}?week=${espnWeek}&year=${year}`;
+  
   const response = await fetch(espnUrl);
 
   if (!response.ok) {
