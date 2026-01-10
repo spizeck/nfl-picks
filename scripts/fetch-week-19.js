@@ -32,10 +32,10 @@ async function fetchWeek19() {
       });
     }
     
-    console.log('\n\nNow trying Wild Card with correct API format...');
+    console.log('\n\nNow trying Wild Card with seasontype=3...');
     
-    // Use seasontype=3 and dates with calendar year for postseason
-    const url = 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3&week=1&dates=2025';
+    // Try with just seasontype and week, no dates parameter
+    const url = 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3&week=1';
     console.log(`URL: ${url}`);
     
     const response = await fetch(url);

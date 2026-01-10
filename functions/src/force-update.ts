@@ -27,7 +27,6 @@ export const forceUpdateWeek = onCall(async (request) => {
     // Convert internal week numbers (19-22) to ESPN postseason weeks
     let espnWeek = week;
     let isPostseason = false;
-    let calendarYear = year;
     
     if (week >= 19 && week <= 22) {
       isPostseason = true;
@@ -37,12 +36,11 @@ export const forceUpdateWeek = onCall(async (request) => {
       else if (week === 21) espnWeek = 3; // Conference Championships
       else if (week === 22) espnWeek = 5; // Super Bowl
       
-      calendarYear = year + 1; // Postseason games are in next calendar year
-      console.log(`Postseason: converting internal week ${week} to ESPN week ${espnWeek}, calendar year ${calendarYear}`);
+      console.log(`Postseason: converting internal week ${week} to ESPN week ${espnWeek}`);
     }
     
     const espnUrl = isPostseason
-      ? `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3&week=${espnWeek}&dates=${calendarYear}`
+      ? `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3&week=${espnWeek}`
       : `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${espnWeek}&year=${year}`;
     
     console.log(`Fetching week ${week} game data from ESPN API: ${espnUrl}`);

@@ -109,7 +109,6 @@ async function fetchFromESPN(year: number, week: number) {
   // Convert internal week numbers (19-22) to ESPN postseason weeks (1-5)
   let espnWeek = week;
   let isPostseason = false;
-  let calendarYear = year;
   
   if (week >= 19 && week <= 22) {
     isPostseason = true;
@@ -119,15 +118,12 @@ async function fetchFromESPN(year: number, week: number) {
     else if (week === 21) espnWeek = 3; // Conference Championships
     else if (week === 22) espnWeek = 5; // Super Bowl (skip week 4 Pro Bowl)
     
-    // Postseason games are played in the calendar year AFTER the season year
-    calendarYear = year + 1;
-    
-    console.log(`Postseason week: converting internal week ${week} to ESPN week ${espnWeek}, using calendar year ${calendarYear}`);
+    console.log(`Postseason week: converting internal week ${week} to ESPN week ${espnWeek}`);
   }
   
-  // Use seasontype parameter for postseason
+  // Use seasontype parameter for postseason (no dates parameter needed)
   const espnUrl = isPostseason 
-    ? `${ESPN_API_URL}?seasontype=3&week=${espnWeek}&dates=${calendarYear}`
+    ? `${ESPN_API_URL}?seasontype=3&week=${espnWeek}`
     : `${ESPN_API_URL}?week=${espnWeek}&year=${year}`;
   
   console.log(`Fetching from ESPN: ${espnUrl}`);
@@ -187,7 +183,6 @@ async function updateActiveGameScores(
   // Convert internal week numbers (19-22) to ESPN postseason weeks
   let espnWeek = week;
   let isPostseason = false;
-  let calendarYear = year;
   
   if (week >= 19 && week <= 22) {
     isPostseason = true;
@@ -197,12 +192,11 @@ async function updateActiveGameScores(
     else if (week === 21) espnWeek = 3; // Conference Championships
     else if (week === 22) espnWeek = 5; // Super Bowl
     
-    calendarYear = year + 1; // Postseason games are in the next calendar year
-    console.log(`Postseason: converting internal week ${week} to ESPN week ${espnWeek}, calendar year ${calendarYear}`);
+    console.log(`Postseason: converting internal week ${week} to ESPN week ${espnWeek}`);
   }
   
   const espnUrl = isPostseason
-    ? `${ESPN_API_URL}?seasontype=3&week=${espnWeek}&dates=${calendarYear}`
+    ? `${ESPN_API_URL}?seasontype=3&week=${espnWeek}`
     : `${ESPN_API_URL}?week=${espnWeek}&year=${year}`;
   
   const response = await fetch(espnUrl);

@@ -77,11 +77,10 @@ export const updateGameScores = onSchedule(
       }
       
       // Fetch actual game data from ESPN API
-      // For postseason, use seasontype=3 and dates parameter with calendar year
+      // For postseason, use seasontype=3 (no dates parameter needed)
       let espnUrl;
       if (seasonType === 3) {
-        const calendarYear = currentYear + 1; // Postseason games are in next calendar year
-        espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3&week=${espnWeek}&dates=${calendarYear}`;
+        espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3&week=${espnWeek}`;
         console.log(`Fetching postseason game data: ${espnUrl} (ESPN week: ${espnWeek}, internal week: ${currentWeek})`);
       } else {
         espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}&year=${currentYear}`;
