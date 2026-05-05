@@ -41,7 +41,7 @@ interface ESPNCompetitor {
   }>;
 }
 
-interface ESPNEvent {
+export interface ESPNEvent {
   id: string;
   date: string;
   name: string;

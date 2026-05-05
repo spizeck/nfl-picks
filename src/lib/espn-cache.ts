@@ -1,5 +1,6 @@
 import { getAdminDb } from "./firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
+import type { ESPNEvent } from "./espn-data";
 
 export interface CacheEntry<T> {
   data: T;
@@ -25,7 +26,7 @@ const SCORE_UPDATE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 export async function getCachedSchedule(
   year: number,
   week: number
-): Promise<any[] | null> {
+): Promise<ESPNEvent[] | null> {
   const adminDb = getAdminDb();
   if (!adminDb) return null;
 
@@ -48,7 +49,7 @@ export async function getCachedSchedule(
 export async function setCachedSchedule(
   year: number,
   week: number,
-  events: any[]
+  events: ESPNEvent[]
 ): Promise<void> {
   const adminDb = getAdminDb();
   if (!adminDb) return;

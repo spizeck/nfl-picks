@@ -5,8 +5,6 @@ import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
 import {
   getCachedSchedule,
   setCachedSchedule,
-  shouldUpdateScores,
-  markScoresUpdated,
 } from "@/lib/espn-cache";
 
 const ESPN_API_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";

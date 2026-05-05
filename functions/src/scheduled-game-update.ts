@@ -17,7 +17,8 @@ export const updateGameScores = onSchedule(
     timeZone: "America/New_York",
     memory: "256MiB",
   },
-  async (event) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_event) => {
     console.log("Starting scheduled game score update");
     
     const db = admin.firestore();
@@ -163,7 +164,7 @@ export const updateGameScores = onSchedule(
             skippedCount++;
           }
         } catch (error) {
-          console.error(`Error processing game ${(event as any).id}:`, error);
+          console.error(`Error processing game ${(event as { id?: string }).id}:`, error);
         }
       }
       
@@ -224,7 +225,8 @@ export const updateScoresNow = onSchedule(
     timeZone: "America/New_York",
     memory: "256MiB",
   },
-  async (event) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_event) => {
     console.log("Running manual score update trigger");
     
     // Call the same logic as the main function but bypass the throttle check
@@ -253,7 +255,8 @@ export const forceUpdateWeek17 = onSchedule(
     timeZone: "America/New_York",
     memory: "256MiB",
   },
-  async (event) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_event) => {
     console.log("Force updating week 17 games");
     
     const db = admin.firestore();
@@ -329,7 +332,7 @@ async function updateWeekGames(week: number, year: number) {
       
       updatedCount++;
     } catch (error) {
-      console.error(`Error processing game ${(event as any).id}:`, error);
+      console.error(`Error processing game ${(event as { id?: string }).id}:`, error);
     }
   }
   

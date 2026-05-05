@@ -58,7 +58,7 @@ export const forceUpdateWeek = onCall(async (request) => {
     // Process each game
     const batch = db.batch();
     let updatedCount = 0;
-    let finalGames = [];
+    const finalGames: string[] = [];
     
     for (const event of events) {
       try {
@@ -104,7 +104,7 @@ export const forceUpdateWeek = onCall(async (request) => {
         
         updatedCount++;
       } catch (error) {
-        console.error(`Error processing game ${(event as any).id}:`, error);
+        console.error(`Error processing game ${(event as { id?: string }).id}:`, error);
       }
     }
     
