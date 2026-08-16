@@ -19,15 +19,12 @@ interface User {
 
 export function AuthLanding() {
   const [, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !!getFirebaseAuth());
   const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
+    if (!auth) return;
 
     const unsubscribe = auth.onAuthStateChanged((firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {

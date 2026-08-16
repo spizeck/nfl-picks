@@ -67,6 +67,13 @@ export async function POST(request: NextRequest) {
     const now = Timestamp.now();
     const isLocked = gameStartTime.toMillis() <= now.toMillis();
 
+    if (isLocked) {
+      return NextResponse.json(
+        { error: "Picks are locked - this game has already started" },
+        { status: 403 }
+      );
+    }
+
     const pickData: Partial<UserPick> = {
       gameId,
       selectedTeam,
