@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,13 +23,19 @@ type TimePeriod = "week" | "season" | "allTime";
 
 interface LeaderboardCardProps {
   selectedWeek?: number | null;
-  selectedYear?: number;
+  // The current season year, resolved by the parent. `null` means it
+  // hasn't been resolved yet, in which case we simply wait.
+  selectedYear: number | null;
 }
+
+// Debounce fetches so rapidly toggling between time periods (or other
+// quick successive prop changes) doesn't fire a burst of Firestore reads.
+const FETCH_DEBOUNCE_MS = 300;
 
 export function LeaderboardCard({
   selectedWeek,
-  selectedYear = new Date().getFullYear(),
-}: LeaderboardCardProps = {}) {
+  selectedYear,
+}: LeaderboardCardProps) {
   const [open, setOpen] = useState(true);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,83 +43,104 @@ export function LeaderboardCard({
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("season");
   const [showAll, setShowAll] = useState(false);
 
+  // Cache leaderboard results per (timePeriod, week, year) so switching
+  // back to a previously-viewed tab doesn't re-hit Firestore.
+  const cacheRef = useRef<Map<string, LeaderboardEntry[]>>(new Map());
+
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      const db = getFirestoreDb();
-      if (!db) {
+    if (selectedYear === null) return;
+
+    const cacheKey = `${timePeriod}:${selectedWeek ?? "none"}:${selectedYear}`;
+
+    const timeoutId = setTimeout(() => {
+      const cached = cacheRef.current.get(cacheKey);
+      if (cached) {
+        setLeaderboard(cached);
         setLoading(false);
         return;
       }
 
-      try {
-        const usersSnapshot = await getDocs(collection(db, "users"));
-        const entries: LeaderboardEntry[] = [];
+      const fetchLeaderboard = async () => {
+        const db = getFirestoreDb();
+        if (!db) {
+          setLoading(false);
+          return;
+        }
 
-        for (const userDoc of usersSnapshot.docs) {
-          const userData = userDoc.data();
-          let wins = 0;
-          let losses = 0;
+        setLoading(true);
+        try {
+          const usersSnapshot = await getDocs(collection(db, "users"));
+          const entries: LeaderboardEntry[] = [];
 
-          if (timePeriod === "week" && selectedWeek) {
-            // Fetch weekly stats from new hierarchical structure
-            const weekDocRef = doc(
-              db,
-              `users/${userDoc.id}/seasons/${selectedYear}/weeks/${selectedWeek}`
-            );
-            const weekDoc = await getDoc(weekDocRef);
+          for (const userDoc of usersSnapshot.docs) {
+            const userData = userDoc.data();
+            let wins = 0;
+            let losses = 0;
 
-            if (weekDoc.exists()) {
-              const weekData = weekDoc.data();
-              wins = weekData.wins || 0;
-              losses = weekData.losses || 0;
+            if (timePeriod === "week" && selectedWeek) {
+              // Fetch weekly stats from new hierarchical structure
+              const weekDocRef = doc(
+                db,
+                `users/${userDoc.id}/seasons/${selectedYear}/weeks/${selectedWeek}`
+              );
+              const weekDoc = await getDoc(weekDocRef);
+
+              if (weekDoc.exists()) {
+                const weekData = weekDoc.data();
+                wins = weekData.wins || 0;
+                losses = weekData.losses || 0;
+              }
+            } else if (timePeriod === "season") {
+              // Fetch season stats from new hierarchical structure
+              const seasonDocRef = doc(
+                db,
+                `users/${userDoc.id}/seasons/${selectedYear}`
+              );
+              const seasonDoc = await getDoc(seasonDocRef);
+
+              if (seasonDoc.exists()) {
+                const seasonData = seasonDoc.data();
+                wins = seasonData.totalWins || 0;
+                losses = seasonData.totalLosses || 0;
+              }
+            } else {
+              // All time - sum all seasons
+              const seasonsSnapshot = await getDocs(
+                collection(db, `users/${userDoc.id}/seasons`)
+              );
+
+              seasonsSnapshot.docs.forEach((seasonDoc) => {
+                const seasonData = seasonDoc.data();
+                wins += seasonData.totalWins || 0;
+                losses += seasonData.totalLosses || 0;
+              });
             }
-          } else if (timePeriod === "season") {
-            // Fetch season stats from new hierarchical structure
-            const seasonDocRef = doc(
-              db,
-              `users/${userDoc.id}/seasons/${selectedYear}`
-            );
-            const seasonDoc = await getDoc(seasonDocRef);
 
-            if (seasonDoc.exists()) {
-              const seasonData = seasonDoc.data();
-              wins = seasonData.totalWins || 0;
-              losses = seasonData.totalLosses || 0;
-            }
-          } else {
-            // All time - sum all seasons
-            const seasonsSnapshot = await getDocs(
-              collection(db, `users/${userDoc.id}/seasons`)
-            );
+            const totalGames = wins + losses;
+            const winPercentage = totalGames > 0 ? (wins / totalGames) * 100 : 0;
 
-            seasonsSnapshot.docs.forEach((seasonDoc) => {
-              const seasonData = seasonDoc.data();
-              wins += seasonData.totalWins || 0;
-              losses += seasonData.totalLosses || 0;
+            entries.push({
+              uid: userDoc.id,
+              displayName: userData.displayName || "Anonymous",
+              wins,
+              losses,
+              winPercentage,
             });
           }
 
-          const totalGames = wins + losses;
-          const winPercentage = totalGames > 0 ? (wins / totalGames) * 100 : 0;
-
-          entries.push({
-            uid: userDoc.id,
-            displayName: userData.displayName || "Anonymous",
-            wins,
-            losses,
-            winPercentage,
-          });
+          cacheRef.current.set(cacheKey, entries);
+          setLeaderboard(entries);
+        } catch (error) {
+          console.error("Error fetching leaderboard:", error);
+        } finally {
+          setLoading(false);
         }
+      };
 
-        setLeaderboard(entries);
-      } catch (error) {
-        console.error("Error fetching leaderboard:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      fetchLeaderboard();
+    }, FETCH_DEBOUNCE_MS);
 
-    fetchLeaderboard();
+    return () => clearTimeout(timeoutId);
   }, [timePeriod, selectedWeek, selectedYear]);
 
   const sortedLeaderboard = [...leaderboard].sort((a, b) => {

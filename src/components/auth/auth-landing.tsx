@@ -19,12 +19,18 @@ interface User {
 
 export function AuthLanding() {
   const [, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(() => !!getFirebaseAuth());
+  const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
-    if (!auth) return;
+    if (!auth) {
+      // No Firebase auth available in this environment (e.g. missing
+      // config) - nothing to wait on, so clear the loading state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
 
     const unsubscribe = auth.onAuthStateChanged((firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {

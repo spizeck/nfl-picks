@@ -30,7 +30,10 @@ interface DashboardProps {
 }
 
 export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
-  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  // Resolved on the client only (via the effect below) to avoid deriving
+  // the year from Date() during render, which could differ between the
+  // server and client around year boundaries.
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
   const [games, setGames] = useState<NormalizedGame[]>([]);
   const [picks, setPicks] = useState<Record<string, "away" | "home">>({});
   const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});
@@ -46,17 +49,19 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
         const response = await fetch('/api/current-week');
         if (response.ok) {
           const data = await response.json();
-          if (data.year) {
-            setCurrentYear(data.year);
-          }
+          setCurrentYear(data.year || new Date().getFullYear());
           if (selectedWeek === null) {
             onWeekChange(data.week);
           }
-        } else if (selectedWeek === null) {
-          onWeekChange(17); // Default to week 17 if API fails
+        } else {
+          setCurrentYear(new Date().getFullYear());
+          if (selectedWeek === null) {
+            onWeekChange(17); // Default to week 17 if API fails
+          }
         }
       } catch (error) {
         console.error("Error fetching current week:", error);
+        setCurrentYear(new Date().getFullYear());
         if (selectedWeek === null) {
           onWeekChange(17); // Default to week 17 if API fails
         }
@@ -70,7 +75,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
   }, []);
 
   useEffect(() => {
-    if (selectedWeek === null) return;
+    if (selectedWeek === null || currentYear === null) return;
 
     const fetchGames = async () => {
       setLoading(true);
@@ -175,7 +180,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
 
   const handleSavePicks = async () => {
     const auth = getFirebaseAuth();
-    if (!auth?.currentUser || selectedWeek === null) return;
+    if (!auth?.currentUser || selectedWeek === null || currentYear === null) return;
 
     setSaving(true);
     try {
