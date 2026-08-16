@@ -30,7 +30,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
-  const [currentYear] = useState(2025); // Updated to 2025 for current NFL season
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
   const [games, setGames] = useState<NormalizedGame[]>([]);
   const [picks, setPicks] = useState<Record<string, "away" | "home">>({});
   const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});
@@ -39,7 +39,6 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
   >({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     const fetchCurrentWeek = async () => {
@@ -47,6 +46,9 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
         const response = await fetch('/api/current-week');
         if (response.ok) {
           const data = await response.json();
+          if (data.year) {
+            setCurrentYear(data.year);
+          }
           if (selectedWeek === null) {
             onWeekChange(data.week);
           }
@@ -64,7 +66,8 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
     };
 
     fetchCurrentWeek();
-  }, [currentYear]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (selectedWeek === null) return;
@@ -155,16 +158,13 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
     fetchPicks();
   }, [games, selectedWeek, currentYear]);
 
-  useEffect(() => {
-    const hasChanges =
-      Object.keys(picks).some(
-        (gameId) => picks[gameId] !== savedPicks[gameId]
-      ) ||
-      Object.keys(savedPicks).some(
-        (gameId) => picks[gameId] !== savedPicks[gameId]
-      );
-    setHasUnsavedChanges(hasChanges);
-  }, [picks, savedPicks]);
+  const hasUnsavedChanges =
+    Object.keys(picks).some(
+      (gameId) => picks[gameId] !== savedPicks[gameId]
+    ) ||
+    Object.keys(savedPicks).some(
+      (gameId) => picks[gameId] !== savedPicks[gameId]
+    );
 
   const handlePickChange = (gameId: string, side: "away" | "home") => {
     setPicks((prev) => ({
@@ -207,7 +207,6 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
 
       await Promise.all(savePromises);
       setSavedPicks(picks);
-      setHasUnsavedChanges(false);
     } catch (error) {
       console.error("Error saving picks:", error);
     } finally {
