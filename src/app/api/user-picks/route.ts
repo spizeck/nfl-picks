@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, getAdminAuth } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import type { UserPick } from "@/lib/types";
+import { isGameDateInSeason } from "@/lib/nfl-season";
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,7 +64,11 @@ export async function POST(request: NextRequest) {
     }
 
     const gameData = gameDoc.data()!;
-    if (gameData.year !== year || gameData.week !== week) {
+    if (
+      gameData.year !== year ||
+      gameData.week !== week ||
+      !isGameDateInSeason(gameData.date, year, week)
+    ) {
       return NextResponse.json(
         { error: "Game does not belong to the requested season and week" },
         { status: 400 }

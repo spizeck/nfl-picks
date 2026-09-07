@@ -82,12 +82,22 @@ test("schedule URLs explicitly identify the NFL season and type", () => {
   assert.equal(isGameDateInSeason("2027-01-16T05:00:00Z", 2026, 19), true);
 });
 
-test("wrong-season and mixed cached responses are rejected", () => {
-  const selection = getScheduleRequest(2026, 1);
-  assert.equal(isMatchingSchedule(scoreboard(2025, 2, 1, "2025-09-05T00:20:00Z"), selection), false);
-  const mixed = scoreboard(2026, 2, 1, "2026-09-10T00:20:00Z");
-  mixed.events!.push({ season: { year: 2025, type: 2 }, week: { number: 1 } } as never);
+test("mismatched top-level and event metadata are rejected", () => {
+  const selection = getScheduleRequest(2026, 19);
+  assert.equal(isMatchingSchedule(scoreboard(2025, 3, 1, "2026-01-16T05:00:00Z"), selection), false);
+  assert.equal(isMatchingSchedule(scoreboard(2026, 2, 1, "2026-09-10T00:20:00Z"), selection), false);
+  assert.equal(isMatchingSchedule(scoreboard(2026, 3, 2, "2027-01-23T05:00:00Z"), selection), false);
+
+  const mixed = scoreboard(2026, 3, 1, "2027-01-16T05:00:00Z");
+  mixed.events!.push({ season: { year: 2025, type: 3 }, week: { number: 1 } } as never);
   assert.equal(isMatchingSchedule(mixed, selection), false);
-  assert.equal(isGameDateInSeason("2025-09-05T00:20:00Z", 2026, 1), false);
+});
+
+test("January and February games are accepted only for the preceding NFL season", () => {
+  const wildCard = scoreboard(2026, 3, 1, "2027-01-16T05:00:00Z");
+  assert.equal(isMatchingSchedule(wildCard, getScheduleRequest(2026, 19)), true);
+  assert.equal(isGameDateInSeason("2027-01-16T05:00:00Z", 2026, 19), true);
   assert.equal(isGameDateInSeason("2027-02-14T23:30:00Z", 2026, 22), true);
+  assert.equal(isGameDateInSeason("2027-01-16T05:00:00Z", 2027, 19), false);
+  assert.equal(isGameDateInSeason("2025-09-05T00:20:00Z", 2026, 1), false);
 });
