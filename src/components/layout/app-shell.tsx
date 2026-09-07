@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { getFirebaseAuth } from "@/lib/firebase"
+import { PwaControls } from "@/components/pwa/pwa-controls"
 
 interface AppShellProps {
   children: ReactNode
@@ -70,6 +71,7 @@ function AppHeader({ user }: AppHeaderProps) {
       <div className="flex-1" />
 
       <div className="flex items-center gap-2 md:gap-3">
+        <PwaControls />
         {user && (
           <span className="text-sm text-muted-foreground px-2 py-1">
             {user.displayName || user.email}
