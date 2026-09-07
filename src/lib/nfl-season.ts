@@ -48,6 +48,8 @@ export function getScheduleRequest(year: number, internalWeek: number): NFLWeekS
 }
 
 export function buildESPNScoreboardUrl(selection: Pick<NFLWeekSelection, "year" | "seasonType" | "espnWeek">): string {
+  // ESPN treats `dates` as the NFL season identifier here, including postseason
+  // games played in the following calendar year. Omitting it reintroduces rollover ambiguity.
   const params = new URLSearchParams({
     dates: selection.year.toString(),
     seasontype: selection.seasonType.toString(),

@@ -69,11 +69,17 @@ test("postseason maps to internal weeks and skips the Pro Bowl", () => {
   });
 });
 
-test("schedule URLs explicitly identify ESPN season and type", () => {
-  const url = new URL(buildESPNScoreboardUrl(getScheduleRequest(2026, 1)));
-  assert.equal(url.searchParams.get("dates"), "2026");
-  assert.equal(url.searchParams.get("seasontype"), "2");
-  assert.equal(url.searchParams.get("week"), "1");
+test("schedule URLs explicitly identify the NFL season and type", () => {
+  const regularUrl = new URL(buildESPNScoreboardUrl(getScheduleRequest(2026, 1)));
+  assert.equal(regularUrl.searchParams.get("dates"), "2026");
+  assert.equal(regularUrl.searchParams.get("seasontype"), "2");
+  assert.equal(regularUrl.searchParams.get("week"), "1");
+
+  const postseasonUrl = new URL(buildESPNScoreboardUrl(getScheduleRequest(2026, 19)));
+  assert.equal(postseasonUrl.searchParams.get("dates"), "2026");
+  assert.equal(postseasonUrl.searchParams.get("seasontype"), "3");
+  assert.equal(postseasonUrl.searchParams.get("week"), "1");
+  assert.equal(isGameDateInSeason("2027-01-16T05:00:00Z", 2026, 19), true);
 });
 
 test("wrong-season and mixed cached responses are rejected", () => {
