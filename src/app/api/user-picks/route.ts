@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, getAdminAuth } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import type { UserPick } from "@/lib/types";
+import { isGameDateInSeason } from "@/lib/nfl-season";
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,8 +63,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const gameData = gameDoc.data();
-    const gameStartTime = Timestamp.fromDate(new Date(gameData!.date));
+    const gameData = gameDoc.data()!;
+    if (
+      gameData.year !== year ||
+      gameData.week !== week ||
+      !isGameDateInSeason(gameData.date, year, week)
+    ) {
+      return NextResponse.json(
+        { error: "Game does not belong to the requested season and week" },
+        { status: 400 }
+      );
+    }
+    if (selectedTeam !== gameData.home?.id && selectedTeam !== gameData.away?.id) {
+      return NextResponse.json({ error: "Selected team is not in this game" }, { status: 400 });
+    }
+
+    const gameStartTime = Timestamp.fromDate(new Date(gameData.date));
     const now = Timestamp.now();
     const isLocked = gameStartTime.toMillis() <= now.toMillis();
 

@@ -1,6 +1,13 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import { normalizeESPNGame } from "./lib/espn-data";
+import {
+  assertMatchingSchedule,
+  buildScoreboardUrl,
+  getScheduleRequest,
+  resolveCurrentWeek,
+  setScheduleSync,
+} from "./lib/nfl-season";
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -25,8 +32,9 @@ export const updateGameScores = onSchedule(
     
     try {
       // First, get current week info from ESPN API
-      const currentCalendarYear = new Date().getFullYear();
-      const weekInfoUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=1`;
+      const now = new Date();
+      const currentYear = now.getUTCMonth() <= 1 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+      const weekInfoUrl = buildScoreboardUrl(getScheduleRequest(currentYear, 1));
       
       console.log(`Fetching week info from ESPN API: ${weekInfoUrl}`);
       const weekInfoResponse = await fetch(weekInfoUrl);
@@ -36,23 +44,9 @@ export const updateGameScores = onSchedule(
       }
       
       const weekInfoData = await weekInfoResponse.json();
-      let currentWeek = weekInfoData.week?.number || getCurrentNFLWeekFallback();
-      const currentYear = weekInfoData.season?.year || currentCalendarYear;
-      const seasonType = weekInfoData.season?.type || 2;
-      
-      // ESPN uses seasontype=3 with weeks 1-5 for postseason, but we use 19-22 internally
-      // Store the ESPN week for API calls
-      const espnWeek = currentWeek;
-      
-      // Convert ESPN's postseason weeks to our internal numbering
-      if (seasonType === 3) {
-        // Postseason: ESPN weeks map to our internal weeks
-        if (currentWeek === 1) currentWeek = 19; // Wild Card
-        else if (currentWeek === 2) currentWeek = 20; // Divisional
-        else if (currentWeek === 3) currentWeek = 21; // Conference Championships
-        else if (currentWeek === 5) currentWeek = 22; // Super Bowl
-        else if (currentWeek === 4) currentWeek = 21; // Pro Bowl - treat as Conference week
-      }
+      const currentSelection = resolveCurrentWeek(weekInfoData, now);
+      const currentWeek = currentSelection.week;
+      const seasonType = currentSelection.seasonType;
       
       console.log(`Current NFL week: ${currentWeek}, year: ${currentYear}, season type: ${seasonType}`);
       
@@ -79,14 +73,9 @@ export const updateGameScores = onSchedule(
       
       // Fetch actual game data from ESPN API
       // For postseason, use seasontype=3 (no dates parameter needed)
-      let espnUrl;
-      if (seasonType === 3) {
-        espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3&week=${espnWeek}`;
-        console.log(`Fetching postseason game data: ${espnUrl} (ESPN week: ${espnWeek}, internal week: ${currentWeek})`);
-      } else {
-        espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${currentWeek}&year=${currentYear}`;
-        console.log(`Fetching regular season game data: ${espnUrl}`);
-      }
+      const selection = getScheduleRequest(currentYear, currentWeek);
+      const espnUrl = buildScoreboardUrl(selection);
+      console.log(`Fetching game data: ${espnUrl}`);
       
       const response = await fetch(espnUrl);
       if (!response.ok) {
@@ -94,6 +83,7 @@ export const updateGameScores = onSchedule(
       }
       
       const data = await response.json();
+      assertMatchingSchedule(data, selection);
       const events = data.events || [];
       
       console.log(`Found ${events.length} games from ESPN API`);
@@ -170,6 +160,7 @@ export const updateGameScores = onSchedule(
       
       // Commit all updates
       await batch.commit();
+      await setScheduleSync(db, selection, events.map((event: {id: string}) => event.id));
       
       // Update the last update timestamp
       await lastUpdateRef.set({
@@ -187,36 +178,6 @@ export const updateGameScores = onSchedule(
     }
   }
 );
-
-/**
- * Fallback function to calculate NFL week if ESPN API fails
- */
-function getCurrentNFLWeekFallback(): number {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  
-  // NFL season typically starts in early September
-  // Use current year if we're past August, otherwise previous year
-  const seasonYear = now.getMonth() >= 7 ? currentYear : currentYear - 1;
-  const startDate = new Date(seasonYear, 8, 1); // September 1st of season year
-  
-  // Calculate weeks since start of season
-  const diffTime = Math.abs(now.getTime() - startDate.getTime());
-  const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
-  
-  // Handle postseason weeks (Wild Card is week 19, Divisional is week 20, etc.)
-  // Regular season is 18 weeks, then postseason starts
-  if (diffWeeks > 18) {
-    // Return appropriate postseason week number
-    if (diffWeeks === 19) return 19; // Wild Card week
-    if (diffWeeks === 20) return 20; // Divisional week
-    if (diffWeeks === 21) return 21; // Conference championship
-    if (diffWeeks === 22) return 22; // Super Bowl
-  }
-  
-  // Ensure week is between 1 and 18 for regular season
-  return Math.min(Math.max(diffWeeks, 1), 18);
-}
 
 // Manual trigger function that actually works
 export const updateScoresNow = onSchedule(
@@ -266,7 +227,9 @@ export const forceUpdateWeek17 = onSchedule(
       await db.collection("config").doc("lastGameUpdate").delete();
       
       // Force update week 17
-      await updateWeekGames(17, 2025); // Assuming 2025 season
+      const now = new Date();
+      const seasonYear = now.getUTCMonth() <= 1 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+      await updateWeekGames(17, seasonYear);
       
       console.log("Week 17 force update completed");
     } catch (error) {
@@ -280,7 +243,8 @@ async function updateWeekGames(week: number, year: number) {
   const db = admin.firestore();
   
   // Fetch game data from ESPN API
-  const espnUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&year=${year}`;
+  const selection = getScheduleRequest(year, week);
+  const espnUrl = buildScoreboardUrl(selection);
   console.log(`Fetching week ${week} game data from ESPN API: ${espnUrl}`);
   
   const response = await fetch(espnUrl);
@@ -289,6 +253,7 @@ async function updateWeekGames(week: number, year: number) {
   }
   
   const data = await response.json();
+  assertMatchingSchedule(data, selection);
   const events = data.events || [];
   
   console.log(`Found ${events.length} games for week ${week}`);
@@ -338,6 +303,7 @@ async function updateWeekGames(week: number, year: number) {
   
   // Commit all updates
   await batch.commit();
+  await setScheduleSync(db, selection, events.map((event: {id: string}) => event.id));
   
   // Update the last update timestamp
   await db.collection("config").doc("lastGameUpdate").set({

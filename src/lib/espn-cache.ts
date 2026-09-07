@@ -1,6 +1,11 @@
 import { getAdminDb } from "./firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import type { ESPNEvent } from "./espn-data";
+import {
+  getScheduleRequest,
+  isMatchingSchedule,
+  isValidScheduleSync,
+} from "./nfl-season";
 
 export interface CacheEntry<T> {
   data: T;
@@ -16,6 +21,16 @@ export interface ScheduleCacheKey {
 
 export interface ScoreUpdateMeta {
   timestamp: Timestamp;
+  week: number;
+  year: number;
+}
+
+export interface ScheduleSyncMeta {
+  timestamp: Timestamp;
+  expiresAt: Timestamp;
+  eventIds: string[];
+  seasonType: number;
+  espnWeek: number;
   week: number;
   year: number;
 }
@@ -43,7 +58,18 @@ export async function getCachedSchedule(
     return null;
   }
 
-  return cachedData.events || null;
+  const events = (cachedData.events || []) as ESPNEvent[];
+  const selection = getScheduleRequest(year, week);
+  return isMatchingSchedule(
+    {
+      season: { year, type: selection.seasonType },
+      week: { number: selection.espnWeek },
+      events,
+    },
+    selection
+  )
+    ? events
+    : null;
 }
 
 export async function setCachedSchedule(
@@ -70,6 +96,62 @@ export async function setCachedSchedule(
       week,
       year,
     });
+}
+
+export async function getFreshScheduleSync(
+  year: number,
+  week: number
+): Promise<string[] | null> {
+  const adminDb = getAdminDb();
+  if (!adminDb) return null;
+
+  const syncDoc = await adminDb.collection("cache").doc(`schedule-sync-${year}-${week}`).get();
+  if (!syncDoc.exists) return null;
+
+  const sync = syncDoc.data() as ScheduleSyncMeta | undefined;
+  const selection = getScheduleRequest(year, week);
+  if (
+    !sync ||
+    !Array.isArray(sync.eventIds) ||
+    !sync.expiresAt ||
+    !isValidScheduleSync(
+      {
+        year: sync.year,
+        week: sync.week,
+        seasonType: sync.seasonType,
+        espnWeek: sync.espnWeek,
+        eventIds: sync.eventIds,
+        expiresAtMillis: sync.expiresAt.toMillis(),
+      },
+      selection
+    )
+  ) {
+    return null;
+  }
+  return sync.eventIds;
+}
+
+export async function setScheduleSync(
+  year: number,
+  week: number,
+  events: ESPNEvent[]
+): Promise<void> {
+  const adminDb = getAdminDb();
+  if (!adminDb || events.length === 0) return;
+
+  const selection = getScheduleRequest(year, week);
+  const now = Timestamp.now();
+  await adminDb.collection("cache").doc(`schedule-sync-${year}-${week}`).set({
+    timestamp: now,
+    expiresAt: Timestamp.fromMillis(
+      now.toMillis() + SCHEDULE_CACHE_DAYS * 24 * 60 * 60 * 1000
+    ),
+    eventIds: events.map((event) => event.id).sort(),
+    seasonType: selection.seasonType,
+    espnWeek: selection.espnWeek,
+    week,
+    year,
+  } satisfies ScheduleSyncMeta);
 }
 
 export async function shouldUpdateScores(): Promise<boolean> {

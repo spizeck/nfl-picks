@@ -46,6 +46,8 @@ export interface ESPNEvent {
   date: string;
   name: string;
   shortName: string;
+  season?: { year?: number; type?: number };
+  week?: { number?: number };
   competitions: Array<{
     competitors: ESPNCompetitor[];
   }>;
@@ -130,20 +132,24 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
       id: awayTeam.team.id,
       name: awayTeam.team.displayName,
       logo: awayTeam.team.logo,
-      record: awayTeam.records?.[0]?.summary,
-      score: awayTeam.score,
+      ...(awayTeam.records?.[0]?.summary !== undefined && {
+        record: awayTeam.records[0].summary,
+      }),
+      ...(awayTeam.score !== undefined && { score: awayTeam.score }),
     },
     home: {
       id: homeTeam.team.id,
       name: homeTeam.team.displayName,
       logo: homeTeam.team.logo,
-      record: homeTeam.records?.[0]?.summary,
-      score: homeTeam.score,
+      ...(homeTeam.records?.[0]?.summary !== undefined && {
+        record: homeTeam.records[0].summary,
+      }),
+      ...(homeTeam.score !== undefined && { score: homeTeam.score }),
     },
     status: {
       state,
       displayText,
-      detail: detail || undefined,
+      ...(detail && { detail }),
     },
   };
 }
@@ -151,13 +157,15 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
 /**
  * Format game time for pre-game display
  */
-function formatGameTime(date: Date): string {
+export function formatGameTime(date: Date): string {
   return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "America/New_York",
+    timeZoneName: "short",
   });
 }
 

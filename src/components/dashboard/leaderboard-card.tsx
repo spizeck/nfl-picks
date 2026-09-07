@@ -42,6 +42,7 @@ export function LeaderboardCard({
   const [sortBy, setSortBy] = useState<"wins" | "percentage">("percentage");
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("season");
   const [showAll, setShowAll] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Cache leaderboard results per (timePeriod, week, year) so switching
   // back to a previously-viewed tab doesn't re-hit Firestore.
@@ -68,6 +69,7 @@ export function LeaderboardCard({
         }
 
         setLoading(true);
+        setError(null);
         try {
           const usersSnapshot = await getDocs(collection(db, "users"));
           const entries: LeaderboardEntry[] = [];
@@ -132,6 +134,7 @@ export function LeaderboardCard({
           setLeaderboard(entries);
         } catch (error) {
           console.error("Error fetching leaderboard:", error);
+          setError("Leaderboard data could not be loaded.");
         } finally {
           setLoading(false);
         }
@@ -280,11 +283,15 @@ export function LeaderboardCard({
                     </div>
                   </div>
                 ))}
-                {displayedLeaderboard.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">
-                    No leaderboard data available
+                {error ? (
+                  <p role="alert" className="text-center text-destructive py-4">
+                    {error}
                   </p>
-                )}
+                ) : displayedLeaderboard.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">
+                    No leaderboard data available yet
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

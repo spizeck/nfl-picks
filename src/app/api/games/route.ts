@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
-import { shouldUpdateScores, markScoresUpdated } from "@/lib/espn-cache";
+import { formatGameTime, normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
+import {
+  getFreshScheduleSync,
+  shouldUpdateScores,
+  markScoresUpdated,
+} from "@/lib/espn-cache";
 import { Timestamp } from "firebase-admin/firestore";
+import {
+  buildESPNScoreboardUrl,
+  getScheduleRequest,
+  getScheduleResponseStatus,
+  hasCompleteStoredSchedule,
+  isGameDateInSeason,
+  isMatchingSchedule,
+  type ESPNScoreboard,
+} from "@/lib/nfl-season";
 
-const ESPN_API_URL =
-  "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
+const SCHEDULE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,40 +49,58 @@ export async function GET(request: NextRequest) {
       .where("week", "==", weekNumber)
       .orderBy("date", "asc");
 
-    const snapshot = await query.get();
-    const games = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      if (data.lastUpdated && data.lastUpdated.toDate) {
-        data.lastUpdated = data.lastUpdated.toDate().toISOString();
-      }
+    const [snapshot, syncedEventIds] = await Promise.all([
+      query.get(),
+      getFreshScheduleSync(yearNumber, weekNumber),
+    ]);
+    const games = snapshot.docs
+      .map((doc) => {
+        const data = doc.data();
+        const updatedAt = data.lastUpdated?.toDate?.();
+        if (updatedAt) data.lastUpdated = updatedAt.toISOString();
 
-      // Ensure data matches NormalizedGame interface
-      // Handle both old format (eventId) and new format (id)
-      if (!data.eventId && data.id) {
-        data.eventId = data.id;
-      }
+        // Ensure data matches NormalizedGame interface
+        // Handle both old format (eventId) and new format (id)
+        if (!data.eventId && data.id) data.eventId = data.id;
 
-      // Ensure status has the correct structure
-      if (data.status && typeof data.status === "string") {
-        // Convert old string status to new object format
-        const statusState =
-          data.status === "post" ? "post" : data.status === "in" ? "in" : "pre";
-        data.status = {
-          state: statusState,
-          displayText: data.status,
-          detail:
-            data.away && data.home
-              ? `${data.away.score || 0}–${data.home.score || 0}`
-              : undefined,
-        };
-      }
+        // Ensure status has the correct structure
+        if (data.status && typeof data.status === "string") {
+          // Convert old string status to new object format
+          const statusState =
+            data.status === "post" ? "post" : data.status === "in" ? "in" : "pre";
+          data.status = {
+            state: statusState,
+            displayText: data.status,
+            detail:
+              data.away && data.home
+                ? `${data.away.score || 0}–${data.home.score || 0}`
+                : undefined,
+          };
+        }
+        if (data.status?.state === "pre" && typeof data.date === "string") {
+          data.status.displayText = formatGameTime(new Date(data.date));
+        }
 
-      return data;
-    });
+        return { data, updatedAt };
+      })
+      .filter(
+        ({ data, updatedAt }) =>
+          typeof data.date === "string" &&
+          isGameDateInSeason(data.date, yearNumber, weekNumber) &&
+          updatedAt instanceof Date &&
+          Date.now() - updatedAt.getTime() < SCHEDULE_MAX_AGE_MS
+      )
+      .map(({ data }) => data);
 
-    if (games.length === 0) {
+    if (
+      !hasCompleteStoredSchedule(
+        snapshot.size,
+        games.map((game) => game.eventId),
+        syncedEventIds
+      )
+    ) {
       console.log(
-        `No games found in Firestore for week ${week}, year ${year}, fetching from ESPN`
+        `Firestore schedule was empty or incomplete for week ${week}, year ${year}; fetching from ESPN`
       );
       return await fetchFromESPN(yearNumber, weekNumber);
     }
@@ -107,54 +137,38 @@ export async function GET(request: NextRequest) {
 
 async function fetchFromESPN(year: number, week: number) {
   // Convert internal week numbers (19-22) to ESPN postseason weeks (1-5)
-  let espnWeek = week;
-  let isPostseason = false;
-  
-  if (week >= 19 && week <= 22) {
-    isPostseason = true;
-    // Map internal weeks to ESPN postseason weeks
-    if (week === 19) espnWeek = 1; // Wild Card
-    else if (week === 20) espnWeek = 2; // Divisional
-    else if (week === 21) espnWeek = 3; // Conference Championships
-    else if (week === 22) espnWeek = 5; // Super Bowl (skip week 4 Pro Bowl)
-    
-    console.log(`Postseason week: converting internal week ${week} to ESPN week ${espnWeek}`);
-  }
-  
-  // Use seasontype parameter for postseason (no dates parameter needed)
-  const espnUrl = isPostseason 
-    ? `${ESPN_API_URL}?seasontype=3&week=${espnWeek}`
-    : `${ESPN_API_URL}?week=${espnWeek}&year=${year}`;
-  
+  const selection = getScheduleRequest(year, week);
+  const espnUrl = buildESPNScoreboardUrl(selection);
+
   console.log(`Fetching from ESPN: ${espnUrl}`);
-  const response = await fetch(espnUrl);
+  const response = await fetch(espnUrl, { next: { revalidate: 300 } });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch data from ESPN API");
+  if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
+
+  const data = (await response.json()) as ESPNScoreboard;
+  const responseStatus = getScheduleResponseStatus(data, selection);
+  if (responseStatus === "unavailable") {
+    return NextResponse.json(
+      { error: "The requested NFL schedule is not available yet." },
+      { status: 404 }
+    );
+  }
+  if (responseStatus === "invalid") {
+    throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
   }
 
-  const data = await response.json();
   const normalized = (data.events || [])
-    .map((event: unknown) => {
+    .map((event) => {
       try {
-        const game = normalizeESPNGame(event as never);
-        // For postseason games, ensure we store with internal week numbering
-        if (isPostseason && game) {
-          return { ...game, week };
-        }
-        return game;
+        return { ...normalizeESPNGame(event as never), week, year };
       } catch (error) {
-        console.error(
-          `Error normalizing event ${
-            (event as { id?: string }).id || "unknown"
-          }:`,
-          error
-        );
+        console.error(`Error normalizing event ${event.id || "unknown"}:`, error);
         return null;
       }
     })
     .filter(
-      (game: NormalizedGame | null): game is NormalizedGame => game !== null
+      (game: (NormalizedGame & { week: number; year: number }) | null):
+        game is NormalizedGame & { week: number; year: number } => game !== null
     );
   return NextResponse.json(normalized);
 }
@@ -181,31 +195,16 @@ async function updateActiveGameScores(
   console.log(`Found ${activeGamesSnapshot.size} active games to update`);
 
   // Convert internal week numbers (19-22) to ESPN postseason weeks
-  let espnWeek = week;
-  let isPostseason = false;
-  
-  if (week >= 19 && week <= 22) {
-    isPostseason = true;
-    // Map internal weeks to ESPN postseason weeks
-    if (week === 19) espnWeek = 1; // Wild Card
-    else if (week === 20) espnWeek = 2; // Divisional
-    else if (week === 21) espnWeek = 3; // Conference Championships
-    else if (week === 22) espnWeek = 5; // Super Bowl
-    
-    console.log(`Postseason: converting internal week ${week} to ESPN week ${espnWeek}`);
-  }
-  
-  const espnUrl = isPostseason
-    ? `${ESPN_API_URL}?seasontype=3&week=${espnWeek}`
-    : `${ESPN_API_URL}?week=${espnWeek}&year=${year}`;
-  
-  const response = await fetch(espnUrl);
+  const selection = getScheduleRequest(year, week);
+  const espnUrl = buildESPNScoreboardUrl(selection);
+  const response = await fetch(espnUrl, { cache: "no-store" });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch data from ESPN API");
-  }
+  if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
 
-  const data = await response.json();
+  const data = (await response.json()) as ESPNScoreboard;
+  if (!isMatchingSchedule(data, selection)) {
+    throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
+  }
   const events = data.events || [];
 
   const batch = adminDb.batch();
