@@ -70,12 +70,20 @@ export function isMatchingSchedule(
   ) {
     return false;
   }
-  return (data.events || []).every(
-    (event) =>
-      event.season?.year === selection.year &&
-      event.season?.type === selection.seasonType &&
-      event.week?.number === selection.espnWeek
+  const events = data.events || [];
+  return (
+    events.length > 0 &&
+    events.every(
+      (event) =>
+        event.season?.year === selection.year &&
+        event.season?.type === selection.seasonType &&
+        event.week?.number === selection.espnWeek
+    )
   );
+}
+
+export function hasCompleteStoredSchedule(totalRecords: number, validRecords: number): boolean {
+  return totalRecords > 0 && totalRecords === validRecords;
 }
 
 export function isGameDateInSeason(date: string, year: number, internalWeek: number): boolean {

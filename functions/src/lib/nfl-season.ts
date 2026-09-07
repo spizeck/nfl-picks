@@ -74,11 +74,13 @@ export function assertMatchingSchedule(
   data: ScoreboardIdentity,
   selection: ScheduleSelection
 ): void {
+  const events = data.events || [];
   const matches =
     data.season?.year === selection.year &&
     data.season?.type === selection.seasonType &&
     data.week?.number === selection.espnWeek &&
-    (data.events || []).every(
+    events.length > 0 &&
+    events.every(
       (event) =>
         event.season?.year === selection.year &&
         event.season?.type === selection.seasonType &&

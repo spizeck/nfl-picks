@@ -4,6 +4,7 @@ import {
   buildESPNScoreboardUrl,
   getNFLSeasonYear,
   getScheduleRequest,
+  hasCompleteStoredSchedule,
   isGameDateInSeason,
   isMatchingSchedule,
   resolveCurrentNFLWeek,
@@ -80,6 +81,17 @@ test("schedule URLs explicitly identify the NFL season and type", () => {
   assert.equal(postseasonUrl.searchParams.get("seasontype"), "3");
   assert.equal(postseasonUrl.searchParams.get("week"), "1");
   assert.equal(isGameDateInSeason("2027-01-16T05:00:00Z", 2026, 19), true);
+});
+
+test("empty and contaminated stored schedules require an ESPN refresh", () => {
+  assert.equal(hasCompleteStoredSchedule(0, 0), false);
+  assert.equal(hasCompleteStoredSchedule(16, 0), false);
+  assert.equal(hasCompleteStoredSchedule(32, 16), false);
+  assert.equal(hasCompleteStoredSchedule(16, 16), true);
+
+  const empty = scoreboard(2026, 2, 1, "2026-09-10T00:20:00Z");
+  empty.events = [];
+  assert.equal(isMatchingSchedule(empty, getScheduleRequest(2026, 1)), false);
 });
 
 test("mismatched top-level and event metadata are rejected", () => {

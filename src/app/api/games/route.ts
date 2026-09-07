@@ -6,6 +6,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import {
   buildESPNScoreboardUrl,
   getScheduleRequest,
+  hasCompleteStoredSchedule,
   isGameDateInSeason,
   isMatchingSchedule,
   type ESPNScoreboard,
@@ -83,9 +84,9 @@ export async function GET(request: NextRequest) {
       )
       .map(({ data }) => data);
 
-    if (games.length === 0) {
+    if (!hasCompleteStoredSchedule(snapshot.size, games.length)) {
       console.log(
-        `No games found in Firestore for week ${week}, year ${year}, fetching from ESPN`
+        `Firestore schedule was empty or incomplete for week ${week}, year ${year}; fetching from ESPN`
       );
       return await fetchFromESPN(yearNumber, weekNumber);
     }
