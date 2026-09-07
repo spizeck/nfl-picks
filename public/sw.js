@@ -1,4 +1,5 @@
-const CACHE_NAME = "nfl-picks-static-v1.1.0";
+const CACHE_PREFIX = "nfl-picks-static-";
+const CACHE_NAME = `${CACHE_PREFIX}v1.1.0`;
 const STATIC_ASSETS = ["/offline.html", "/manifest.webmanifest", "/icon.svg", "/maskable-icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -9,7 +10,13 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+            .map((key) => caches.delete(key))
+        )
+      )
       .then(() => self.clients.claim())
   );
 });

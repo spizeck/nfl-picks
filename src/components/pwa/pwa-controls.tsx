@@ -48,17 +48,23 @@ export function PwaControls() {
     window.addEventListener("appinstalled", handleInstalled);
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").then((registration) => {
-        if (registration.waiting) setWaitingWorker(registration.waiting);
-        registration.addEventListener("updatefound", () => {
-          const worker = registration.installing;
-          worker?.addEventListener("statechange", () => {
-            if (worker.state === "installed" && navigator.serviceWorker.controller) {
-              setWaitingWorker(worker);
-            }
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((registration) => {
+          if (registration.waiting) setWaitingWorker(registration.waiting);
+          registration.addEventListener("updatefound", () => {
+            const worker = registration.installing;
+            worker?.addEventListener("statechange", () => {
+              if (worker.state === "installed" && navigator.serviceWorker.controller) {
+                setWaitingWorker(worker);
+              }
+            });
           });
+        })
+        .catch((error) => {
+          console.error("Service worker registration failed:", error);
+          setWaitingWorker(null);
         });
-      });
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (reloadOnControllerChange.current) window.location.reload();
       });

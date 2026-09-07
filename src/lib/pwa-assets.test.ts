@@ -23,6 +23,17 @@ test("service worker caches only public PWA shell assets", async () => {
   assert.match(worker, /event\.request\.mode === "navigate"/);
   assert.doesNotMatch(worker, /api\/|user-picks|firebase|Authorization/);
   assert.doesNotMatch(worker, /sync|periodicSync/);
+  assert.match(worker, /key\.startsWith\(CACHE_PREFIX\)/);
+  assert.doesNotMatch(worker, /keys\.filter\(\(key\) => key !== CACHE_NAME\)/);
+});
+
+test("service-worker registration failures are handled", async () => {
+  const controls = await readFile(
+    `${root}/src/components/pwa/pwa-controls.tsx`,
+    "utf8"
+  );
+  assert.match(controls, /serviceWorker[\s\S]*\.register\("\/sw\.js"\)[\s\S]*\.catch\(/);
+  assert.match(controls, /Service worker registration failed/);
 });
 
 test("offline page explains that picks are not queued", async () => {
