@@ -46,6 +46,8 @@ export interface ESPNEvent {
   date: string;
   name: string;
   shortName: string;
+  season?: { year?: number; type?: number };
+  week?: { number?: number };
   competitions: Array<{
     competitors: ESPNCompetitor[];
   }>;
@@ -151,13 +153,15 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
 /**
  * Format game time for pre-game display
  */
-function formatGameTime(date: Date): string {
+export function formatGameTime(date: Date): string {
   return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "America/New_York",
+    timeZoneName: "short",
   });
 }
 

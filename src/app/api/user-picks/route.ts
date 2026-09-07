@@ -62,8 +62,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const gameData = gameDoc.data();
-    const gameStartTime = Timestamp.fromDate(new Date(gameData!.date));
+    const gameData = gameDoc.data()!;
+    if (gameData.year !== year || gameData.week !== week) {
+      return NextResponse.json(
+        { error: "Game does not belong to the requested season and week" },
+        { status: 400 }
+      );
+    }
+    if (selectedTeam !== gameData.home?.id && selectedTeam !== gameData.away?.id) {
+      return NextResponse.json({ error: "Selected team is not in this game" }, { status: 400 });
+    }
+
+    const gameStartTime = Timestamp.fromDate(new Date(gameData.date));
     const now = Timestamp.now();
     const isLocked = gameStartTime.toMillis() <= now.toMillis();
 

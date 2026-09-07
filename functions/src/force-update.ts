@@ -1,6 +1,7 @@
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { normalizeESPNGame } from "./lib/espn-data";
+import {assertMatchingSchedule, buildScoreboardUrl, getScheduleRequest} from "./lib/nfl-season";
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -25,23 +26,8 @@ export const forceUpdateWeek = onCall(async (request) => {
   
   try {
     // Convert internal week numbers (19-22) to ESPN postseason weeks
-    let espnWeek = week;
-    let isPostseason = false;
-    
-    if (week >= 19 && week <= 22) {
-      isPostseason = true;
-      // Map internal weeks to ESPN postseason weeks
-      if (week === 19) espnWeek = 1; // Wild Card
-      else if (week === 20) espnWeek = 2; // Divisional
-      else if (week === 21) espnWeek = 3; // Conference Championships
-      else if (week === 22) espnWeek = 5; // Super Bowl
-      
-      console.log(`Postseason: converting internal week ${week} to ESPN week ${espnWeek}`);
-    }
-    
-    const espnUrl = isPostseason
-      ? `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=3&week=${espnWeek}`
-      : `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${espnWeek}&year=${year}`;
+    const selection = getScheduleRequest(year, week);
+    const espnUrl = buildScoreboardUrl(selection);
     
     console.log(`Fetching week ${week} game data from ESPN API: ${espnUrl}`);
     
@@ -51,6 +37,7 @@ export const forceUpdateWeek = onCall(async (request) => {
     }
     
     const data = await response.json();
+    assertMatchingSchedule(data, selection);
     const events = data.events || [];
     
     console.log(`Found ${events.length} games for week ${week}`);

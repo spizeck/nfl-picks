@@ -6,8 +6,12 @@ import {
   getCachedSchedule,
   setCachedSchedule,
 } from "@/lib/espn-cache";
-
-const ESPN_API_URL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
+import {
+  buildESPNScoreboardUrl,
+  getScheduleRequest,
+  isMatchingSchedule,
+  type ESPNScoreboard,
+} from "@/lib/nfl-season";
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,14 +44,16 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`Fetching fresh schedule from ESPN for week ${week}, year ${year}`);
-    const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
-    const response = await fetch(espnUrl);
+    const selection = getScheduleRequest(yearNumber, weekNumber);
+    const espnUrl = buildESPNScoreboardUrl(selection);
+    const response = await fetch(espnUrl, { next: { revalidate: 300 } });
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch data from ESPN API");
+    if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
+
+    const data = (await response.json()) as ESPNScoreboard;
+    if (!isMatchingSchedule(data, selection)) {
+      throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
     }
-
-    const data = await response.json();
     const events = data.events || [];
 
     const normalizedGames: (NormalizedGame & { week: number; year: number })[] = [];
@@ -97,13 +103,16 @@ export async function GET(request: NextRequest) {
 }
 
 async function fetchFromESPN(year: number, week: number) {
-  const espnUrl = `${ESPN_API_URL}?week=${week}&year=${year}`;
-  const response = await fetch(espnUrl);
+  const selection = getScheduleRequest(year, week);
+  const response = await fetch(buildESPNScoreboardUrl(selection), {
+    next: { revalidate: 300 },
+  });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch data from ESPN API");
+  if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
+
+  const data = (await response.json()) as ESPNScoreboard;
+  if (!isMatchingSchedule(data, selection)) {
+    throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
   }
-
-  const data = await response.json();
   return NextResponse.json(data.events || []);
 }

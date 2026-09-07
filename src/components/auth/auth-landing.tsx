@@ -21,6 +21,7 @@ export function AuthLanding() {
   const [, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -54,11 +55,12 @@ export function AuthLanding() {
     const googleProvider = getGoogleProvider();
     const db = getFirestoreDb();
     if (!auth || !googleProvider) {
-      console.error("Firebase auth not initialized");
+      setSignInError("Google sign-in is not configured for this environment.");
       return;
     }
 
     setSigningIn(true);
+    setSignInError(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
@@ -82,6 +84,14 @@ export function AuthLanding() {
       });
     } catch (error) {
       console.error("Error signing in with Google:", error);
+      const code = (error as { code?: string }).code;
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+        setSignInError(
+          code === "auth/unauthorized-domain"
+            ? "Google sign-in is not authorized for this domain."
+            : "Google sign-in failed. Please retry."
+        );
+      }
     } finally {
       setSigningIn(false);
     }
@@ -132,6 +142,11 @@ export function AuthLanding() {
               </svg>
               Sign in with Google
             </Button>
+            {signInError && (
+              <p role="alert" className="text-sm text-destructive text-center">
+                {signInError}
+              </p>
+            )}
           </div>
           
           <div className="pt-4 border-t">

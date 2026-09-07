@@ -1,6 +1,7 @@
 import { getAdminDb } from "./firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import type { ESPNEvent } from "./espn-data";
+import { getScheduleRequest, isMatchingSchedule } from "./nfl-season";
 
 export interface CacheEntry<T> {
   data: T;
@@ -43,7 +44,18 @@ export async function getCachedSchedule(
     return null;
   }
 
-  return cachedData.events || null;
+  const events = (cachedData.events || []) as ESPNEvent[];
+  const selection = getScheduleRequest(year, week);
+  return isMatchingSchedule(
+    {
+      season: { year, type: selection.seasonType },
+      week: { number: selection.espnWeek },
+      events,
+    },
+    selection
+  )
+    ? events
+    : null;
 }
 
 export async function setCachedSchedule(

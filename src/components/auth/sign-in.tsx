@@ -18,6 +18,7 @@ interface User {
 export function SignIn() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -43,11 +44,12 @@ export function SignIn() {
     const auth = getFirebaseAuth();
     const googleProvider = getGoogleProvider();
     if (!auth || !googleProvider) {
-      console.error("Firebase auth not initialized");
+      setSignInError("Google sign-in is not configured for this environment.");
       return;
     }
     
     setLoading(true);
+    setSignInError(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
@@ -59,6 +61,14 @@ export function SignIn() {
       });
     } catch (error) {
       console.error("Error signing in with Google:", error);
+      const code = (error as { code?: string }).code;
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+        setSignInError(
+          code === "auth/unauthorized-domain"
+            ? "Google sign-in is not authorized for this domain."
+            : "Google sign-in failed. Please retry."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -94,13 +104,20 @@ export function SignIn() {
   }
 
   return (
-    <Button
-      onClick={handleGoogleSignIn}
-      disabled={loading}
-      size="lg"
-    >
-      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      Sign in with Google
-    </Button>
+    <div>
+      <Button
+        onClick={handleGoogleSignIn}
+        disabled={loading}
+        size="lg"
+      >
+        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Sign in with Google
+      </Button>
+      {signInError && (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {signInError}
+        </p>
+      )}
+    </div>
   );
 }

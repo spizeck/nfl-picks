@@ -42,29 +42,25 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
   >({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const fetchCurrentWeek = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const response = await fetch('/api/current-week');
-        if (response.ok) {
-          const data = await response.json();
-          setCurrentYear(data.year || new Date().getFullYear());
-          if (selectedWeek === null) {
-            onWeekChange(data.week);
-          }
-        } else {
-          setCurrentYear(new Date().getFullYear());
-          if (selectedWeek === null) {
-            onWeekChange(17); // Default to week 17 if API fails
-          }
+        const response = await fetch("/api/current-week");
+        if (!response.ok) throw new Error(`Current week request failed (${response.status})`);
+        const data = await response.json();
+        if (!Number.isInteger(data.year) || !Number.isInteger(data.week)) {
+          throw new Error("Current week response was invalid");
         }
+        setCurrentYear(data.year);
+        if (selectedWeek === null) onWeekChange(data.week);
       } catch (error) {
         console.error("Error fetching current week:", error);
-        setCurrentYear(new Date().getFullYear());
-        if (selectedWeek === null) {
-          onWeekChange(17); // Default to week 17 if API fails
-        }
+        setError("Current NFL schedule is temporarily unavailable.");
       } finally {
         setLoading(false);
       }
@@ -72,7 +68,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
 
     fetchCurrentWeek();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [retryCount]);
 
   useEffect(() => {
     if (selectedWeek === null || currentYear === null) return;
@@ -83,14 +79,15 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
         const response = await fetch(
           `/api/games?week=${selectedWeek}&year=${currentYear}`
         );
-        if (response.ok) {
-          const rawEvents = await response.json();
-          // The games API returns normalized data directly
-          const normalized = rawEvents;
-          setGames(normalized);
-        }
+        if (!response.ok) throw new Error(`Games request failed (${response.status})`);
+        const rawEvents = await response.json();
+        // The games API returns normalized data directly
+        const normalized = rawEvents;
+        setGames(normalized);
+        setError(null);
       } catch (error) {
         console.error("Error fetching games:", error);
+        setError("Games are temporarily unavailable. Please retry.");
       } finally {
         setLoading(false);
       }
@@ -210,10 +207,17 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
         });
       });
 
-      await Promise.all(savePromises);
+      const responses = await Promise.all(savePromises);
+      const failedResponse = responses.find((response) => !response.ok);
+      if (failedResponse) {
+        const body = await failedResponse.json().catch(() => null);
+        throw new Error(body?.error || `Failed to save picks (${failedResponse.status})`);
+      }
       setSavedPicks(picks);
+      setError(null);
     } catch (error) {
       console.error("Error saving picks:", error);
+      setError(error instanceof Error ? error.message : "Failed to save picks.");
     } finally {
       setSaving(false);
     }
@@ -227,8 +231,25 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
     );
   }
 
+  if (error && currentYear === null) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-16">
+        <p className="text-muted-foreground">{error}</p>
+        <Button onClick={() => setRetryCount((count) => count + 1)}>Retry</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto">
+      {error && (
+        <div className="mb-4 flex items-center justify-between gap-4 border p-4">
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" onClick={() => setRetryCount((count) => count + 1)}>
+            Retry
+          </Button>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b bg-card p-4 mb-4">
         <div className="flex items-center gap-3">
           <WeekDropdown
