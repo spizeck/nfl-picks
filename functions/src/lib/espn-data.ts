@@ -128,20 +128,24 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
       id: awayTeam.team.id,
       name: awayTeam.team.displayName,
       logo: awayTeam.team.logo,
-      record: awayTeam.records?.[0]?.summary,
-      score: awayTeam.score,
+      ...(awayTeam.records?.[0]?.summary !== undefined && {
+        record: awayTeam.records[0].summary,
+      }),
+      ...(awayTeam.score !== undefined && {score: awayTeam.score}),
     },
     home: {
       id: homeTeam.team.id,
       name: homeTeam.team.displayName,
       logo: homeTeam.team.logo,
-      record: homeTeam.records?.[0]?.summary,
-      score: homeTeam.score,
+      ...(homeTeam.records?.[0]?.summary !== undefined && {
+        record: homeTeam.records[0].summary,
+      }),
+      ...(homeTeam.score !== undefined && {score: homeTeam.score}),
     },
     status: {
       state,
       displayText,
-      detail,
+      ...(detail && {detail}),
     },
   };
 }
