@@ -44,6 +44,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
 
   useEffect(() => {
     const fetchCurrentWeek = async () => {
@@ -69,6 +70,12 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
     fetchCurrentWeek();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryCount]);
+
+  useEffect(() => {
+    if (!showSaveConfirmation) return;
+    const timeoutId = window.setTimeout(() => setShowSaveConfirmation(false), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [showSaveConfirmation]);
 
   useEffect(() => {
     if (selectedWeek === null || currentYear === null) return;
@@ -218,6 +225,7 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
       }
       setSavedPicks(picks);
       setError(null);
+      setShowSaveConfirmation(true);
     } catch (error) {
       console.error("Error saving picks:", error);
       setError(error instanceof Error ? error.message : "Failed to save picks.");
@@ -245,6 +253,14 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
 
   return (
     <div className="max-w-5xl mx-auto">
+      {showSaveConfirmation && (
+        <div
+          role="status"
+          className="fixed right-4 top-4 z-50 rounded-md border bg-card px-4 py-3 font-medium shadow-lg"
+        >
+          Picks saved successfully.
+        </div>
+      )}
       {error && (
         <div className="mb-4 flex items-center justify-between gap-4 border p-4">
           <p className="text-sm text-muted-foreground">{error}</p>
