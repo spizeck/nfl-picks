@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { formatGameTime, normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
+import { formatGameTime, normalizeESPNGame } from "@/lib/espn-data";
 import {
   getFreshScheduleSync,
   shouldUpdateScores,
@@ -8,9 +8,12 @@ import {
 } from "@/lib/espn-cache";
 import { Timestamp } from "firebase-admin/firestore";
 import {
+  ScheduleUnavailableError,
+  synchronizeSchedule,
+} from "@/lib/schedule-sync";
+import {
   buildESPNScoreboardUrl,
   getScheduleRequest,
-  getScheduleResponseStatus,
   hasCompleteStoredSchedule,
   isGameDateInSeason,
   isMatchingSchedule,
@@ -39,8 +42,10 @@ export async function GET(request: NextRequest) {
     const adminDb = getAdminDb();
 
     if (!adminDb) {
-      console.warn("Firebase Admin not configured, falling back to ESPN API");
-      return await fetchFromESPN(yearNumber, weekNumber);
+      return NextResponse.json(
+        { error: "Schedule storage is temporarily unavailable." },
+        { status: 503 }
+      );
     }
 
     const query = adminDb
@@ -102,7 +107,7 @@ export async function GET(request: NextRequest) {
       console.log(
         `Firestore schedule was empty or incomplete for week ${week}, year ${year}; fetching from ESPN`
       );
-      return await fetchFromESPN(yearNumber, weekNumber);
+      return await fetchFromESPN(adminDb, yearNumber, weekNumber);
     }
 
     if (refreshScores) {
@@ -128,49 +133,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(games);
   } catch (error) {
     console.error("Error fetching games:", error);
+    if (error instanceof ScheduleUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     return NextResponse.json(
-      { error: "Failed to fetch games" },
-      { status: 500 }
+      { error: "Games could not be synchronized. Please retry." },
+      { status: 502 }
     );
   }
 }
 
-async function fetchFromESPN(year: number, week: number) {
-  // Convert internal week numbers (19-22) to ESPN postseason weeks (1-5)
+async function fetchFromESPN(
+  adminDb: FirebaseFirestore.Firestore,
+  year: number,
+  week: number
+) {
   const selection = getScheduleRequest(year, week);
-  const espnUrl = buildESPNScoreboardUrl(selection);
-
-  console.log(`Fetching from ESPN: ${espnUrl}`);
-  const response = await fetch(espnUrl, { next: { revalidate: 300 } });
-
-  if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
-
-  const data = (await response.json()) as ESPNScoreboard;
-  const responseStatus = getScheduleResponseStatus(data, selection);
-  if (responseStatus === "unavailable") {
-    return NextResponse.json(
-      { error: "The requested NFL schedule is not available yet." },
-      { status: 404 }
-    );
-  }
-  if (responseStatus === "invalid") {
-    throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
-  }
-
-  const normalized = (data.events || [])
-    .map((event) => {
-      try {
-        return { ...normalizeESPNGame(event as never), week, year };
-      } catch (error) {
-        console.error(`Error normalizing event ${event.id || "unknown"}:`, error);
-        return null;
-      }
-    })
-    .filter(
-      (game: (NormalizedGame & { week: number; year: number }) | null):
-        game is NormalizedGame & { week: number; year: number } => game !== null
-    );
-  return NextResponse.json(normalized);
+  console.log(`Fetching from ESPN: ${buildESPNScoreboardUrl(selection)}`);
+  const { games } = await synchronizeSchedule(adminDb, year, week);
+  return NextResponse.json(games);
 }
 
 async function updateActiveGameScores(

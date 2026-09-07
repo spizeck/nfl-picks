@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, getAdminAuth } from "@/lib/firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
-import type { UserPick } from "@/lib/types";
-import { isGameDateInSeason } from "@/lib/nfl-season";
+import {
+  PickValidationError,
+  saveValidatedPick,
+} from "@/lib/pick-storage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,60 +56,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const gameDoc = await adminDb.collection("games").doc(gameId).get();
-    if (!gameDoc.exists) {
-      return NextResponse.json(
-        { error: "Game not found" },
-        { status: 404 }
-      );
+    try {
+      await saveValidatedPick(adminDb, userId, {
+        gameId,
+        selectedTeam,
+        week,
+        year,
+      });
+    } catch (error) {
+      if (error instanceof PickValidationError) {
+        return NextResponse.json({ error: error.message }, { status: error.status });
+      }
+      throw error;
     }
-
-    const gameData = gameDoc.data()!;
-    if (
-      gameData.year !== year ||
-      gameData.week !== week ||
-      !isGameDateInSeason(gameData.date, year, week)
-    ) {
-      return NextResponse.json(
-        { error: "Game does not belong to the requested season and week" },
-        { status: 400 }
-      );
-    }
-    if (selectedTeam !== gameData.home?.id && selectedTeam !== gameData.away?.id) {
-      return NextResponse.json({ error: "Selected team is not in this game" }, { status: 400 });
-    }
-
-    const gameStartTime = Timestamp.fromDate(new Date(gameData.date));
-    const now = Timestamp.now();
-    const isLocked = gameStartTime.toMillis() <= now.toMillis();
-
-    if (isLocked) {
-      return NextResponse.json(
-        { error: "Picks are locked - this game has already started" },
-        { status: 403 }
-      );
-    }
-
-    const pickData: Partial<UserPick> = {
-      gameId,
-      selectedTeam,
-      timestamp: now,
-      result: "pending",
-      locked: isLocked,
-      gameStartTime,
-    };
-
-    const pickRef = adminDb
-      .collection("users")
-      .doc(userId)
-      .collection("seasons")
-      .doc(year.toString())
-      .collection("weeks")
-      .doc(week.toString())
-      .collection("picks")
-      .doc(gameId);
-
-    await pickRef.set(pickData);
 
     await updateWeekStats(adminDb, userId, year, week);
 
