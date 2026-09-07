@@ -79,7 +79,10 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
         const response = await fetch(
           `/api/games?week=${selectedWeek}&year=${currentYear}`
         );
-        if (!response.ok) throw new Error(`Games request failed (${response.status})`);
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.error || `Games request failed (${response.status})`);
+        }
         const rawEvents = await response.json();
         // The games API returns normalized data directly
         const normalized = rawEvents;

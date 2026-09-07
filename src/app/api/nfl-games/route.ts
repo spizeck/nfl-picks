@@ -5,11 +5,12 @@ import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
 import {
   getCachedSchedule,
   setCachedSchedule,
+  setScheduleSync,
 } from "@/lib/espn-cache";
 import {
   buildESPNScoreboardUrl,
   getScheduleRequest,
-  isMatchingSchedule,
+  getScheduleResponseStatus,
   type ESPNScoreboard,
 } from "@/lib/nfl-season";
 
@@ -51,7 +52,14 @@ export async function GET(request: NextRequest) {
     if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
 
     const data = (await response.json()) as ESPNScoreboard;
-    if (!isMatchingSchedule(data, selection)) {
+    const responseStatus = getScheduleResponseStatus(data, selection);
+    if (responseStatus === "unavailable") {
+      return NextResponse.json(
+        { error: "The requested NFL schedule is not available yet." },
+        { status: 404 }
+      );
+    }
+    if (responseStatus === "invalid") {
       throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
     }
     const events = data.events || [];
@@ -86,7 +94,10 @@ export async function GET(request: NextRequest) {
     }
 
     await batch.commit();
-    await setCachedSchedule(yearNumber, weekNumber, events);
+    await Promise.all([
+      setCachedSchedule(yearNumber, weekNumber, events),
+      setScheduleSync(yearNumber, weekNumber, events),
+    ]);
 
     console.log(
       `Cached ${events.length} events and ${normalizedGames.length} games for week ${week}, year ${year}`
@@ -111,7 +122,14 @@ async function fetchFromESPN(year: number, week: number) {
   if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
 
   const data = (await response.json()) as ESPNScoreboard;
-  if (!isMatchingSchedule(data, selection)) {
+  const responseStatus = getScheduleResponseStatus(data, selection);
+  if (responseStatus === "unavailable") {
+    return NextResponse.json(
+      { error: "The requested NFL schedule is not available yet." },
+      { status: 404 }
+    );
+  }
+  if (responseStatus === "invalid") {
     throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
   }
   return NextResponse.json(data.events || []);

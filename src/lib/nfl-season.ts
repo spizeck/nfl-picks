@@ -59,31 +59,75 @@ export function buildESPNScoreboardUrl(selection: Pick<NFLWeekSelection, "year" 
   return `${ESPN_API_URL}?${params}`;
 }
 
-export function isMatchingSchedule(
+export function getScheduleResponseStatus(
   data: ESPNScoreboard,
   selection: Pick<NFLWeekSelection, "year" | "seasonType" | "espnWeek">
-): boolean {
+): "valid" | "unavailable" | "invalid" {
   if (
     data.season?.year !== selection.year ||
     data.season?.type !== selection.seasonType ||
     data.week?.number !== selection.espnWeek
   ) {
-    return false;
+    return "invalid";
   }
   const events = data.events || [];
+  if (events.length === 0) return "unavailable";
+  return events.every(
+    (event) =>
+      event.season?.year === selection.year &&
+      event.season?.type === selection.seasonType &&
+      event.week?.number === selection.espnWeek
+  )
+    ? "valid"
+    : "invalid";
+}
+
+export function isMatchingSchedule(
+  data: ESPNScoreboard,
+  selection: Pick<NFLWeekSelection, "year" | "seasonType" | "espnWeek">
+): boolean {
+  return getScheduleResponseStatus(data, selection) === "valid";
+}
+
+export interface ScheduleSyncIdentity {
+  year: number;
+  week: number;
+  seasonType: number;
+  espnWeek: number;
+  eventIds: string[];
+  expiresAtMillis: number;
+}
+
+export function isValidScheduleSync(
+  sync: ScheduleSyncIdentity,
+  selection: NFLWeekSelection,
+  now = Date.now()
+): boolean {
   return (
-    events.length > 0 &&
-    events.every(
-      (event) =>
-        event.season?.year === selection.year &&
-        event.season?.type === selection.seasonType &&
-        event.week?.number === selection.espnWeek
-    )
+    sync.year === selection.year &&
+    sync.week === selection.week &&
+    sync.seasonType === selection.seasonType &&
+    sync.espnWeek === selection.espnWeek &&
+    sync.eventIds.length > 0 &&
+    sync.expiresAtMillis > now
   );
 }
 
-export function hasCompleteStoredSchedule(totalRecords: number, validRecords: number): boolean {
-  return totalRecords > 0 && totalRecords === validRecords;
+export function hasCompleteStoredSchedule(
+  totalRecords: number,
+  validEventIds: string[],
+  syncedEventIds: string[] | null
+): boolean {
+  if (
+    totalRecords === 0 ||
+    totalRecords !== validEventIds.length ||
+    !syncedEventIds ||
+    syncedEventIds.length !== validEventIds.length
+  ) {
+    return false;
+  }
+  const validIds = new Set(validEventIds);
+  return syncedEventIds.every((eventId) => validIds.has(eventId));
 }
 
 export function isGameDateInSeason(date: string, year: number, internalWeek: number): boolean {

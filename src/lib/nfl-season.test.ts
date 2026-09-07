@@ -4,9 +4,11 @@ import {
   buildESPNScoreboardUrl,
   getNFLSeasonYear,
   getScheduleRequest,
+  getScheduleResponseStatus,
   hasCompleteStoredSchedule,
   isGameDateInSeason,
   isMatchingSchedule,
+  isValidScheduleSync,
   resolveCurrentNFLWeek,
   resolveNFLWeekFromCalendar,
   toInternalWeek,
@@ -83,15 +85,35 @@ test("schedule URLs explicitly identify the NFL season and type", () => {
   assert.equal(isGameDateInSeason("2027-01-16T05:00:00Z", 2026, 19), true);
 });
 
-test("empty and contaminated stored schedules require an ESPN refresh", () => {
-  assert.equal(hasCompleteStoredSchedule(0, 0), false);
-  assert.equal(hasCompleteStoredSchedule(16, 0), false);
-  assert.equal(hasCompleteStoredSchedule(32, 16), false);
-  assert.equal(hasCompleteStoredSchedule(16, 16), true);
+test("empty, contaminated, and valid-but-partial stored schedules require a refresh", () => {
+  const completeIds = ["game-1", "game-2", "game-3"];
+  assert.equal(hasCompleteStoredSchedule(0, [], null), false);
+  assert.equal(hasCompleteStoredSchedule(3, [], completeIds), false);
+  assert.equal(hasCompleteStoredSchedule(4, completeIds, completeIds), false);
+  assert.equal(hasCompleteStoredSchedule(2, ["game-1", "game-2"], completeIds), false);
+  assert.equal(hasCompleteStoredSchedule(3, completeIds, completeIds), true);
+
+  const selection = getScheduleRequest(2026, 1);
+  const marker = {
+    year: 2026,
+    week: 1,
+    seasonType: 2,
+    espnWeek: 1,
+    eventIds: completeIds,
+    expiresAtMillis: 2_000,
+  };
+  assert.equal(isValidScheduleSync(marker, selection, 1_000), true);
+  assert.equal(isValidScheduleSync(marker, selection, 2_000), false);
+  assert.equal(isValidScheduleSync({ ...marker, espnWeek: 2 }, selection, 1_000), false);
 
   const empty = scoreboard(2026, 2, 1, "2026-09-10T00:20:00Z");
   empty.events = [];
-  assert.equal(isMatchingSchedule(empty, getScheduleRequest(2026, 1)), false);
+  assert.equal(getScheduleResponseStatus(empty, selection), "unavailable");
+  assert.equal(isMatchingSchedule(empty, selection), false);
+  assert.equal(
+    getScheduleResponseStatus(scoreboard(2025, 2, 1, "2025-09-05T00:20:00Z"), selection),
+    "invalid"
+  );
 });
 
 test("mismatched top-level and event metadata are rejected", () => {

@@ -6,6 +6,7 @@ import {
   buildScoreboardUrl,
   getScheduleRequest,
   resolveCurrentWeek,
+  setScheduleSync,
 } from "./lib/nfl-season";
 
 // Initialize Firebase Admin if not already initialized
@@ -159,6 +160,7 @@ export const updateGameScores = onSchedule(
       
       // Commit all updates
       await batch.commit();
+      await setScheduleSync(db, selection, events.map((event: {id: string}) => event.id));
       
       // Update the last update timestamp
       await lastUpdateRef.set({
@@ -301,6 +303,7 @@ async function updateWeekGames(week: number, year: number) {
   
   // Commit all updates
   await batch.commit();
+  await setScheduleSync(db, selection, events.map((event: {id: string}) => event.id));
   
   // Update the last update timestamp
   await db.collection("config").doc("lastGameUpdate").set({

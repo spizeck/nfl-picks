@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { formatGameTime, normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
-import { shouldUpdateScores, markScoresUpdated } from "@/lib/espn-cache";
+import {
+  getFreshScheduleSync,
+  shouldUpdateScores,
+  markScoresUpdated,
+} from "@/lib/espn-cache";
 import { Timestamp } from "firebase-admin/firestore";
 import {
   buildESPNScoreboardUrl,
   getScheduleRequest,
+  getScheduleResponseStatus,
   hasCompleteStoredSchedule,
   isGameDateInSeason,
   isMatchingSchedule,
@@ -44,7 +49,10 @@ export async function GET(request: NextRequest) {
       .where("week", "==", weekNumber)
       .orderBy("date", "asc");
 
-    const snapshot = await query.get();
+    const [snapshot, syncedEventIds] = await Promise.all([
+      query.get(),
+      getFreshScheduleSync(yearNumber, weekNumber),
+    ]);
     const games = snapshot.docs
       .map((doc) => {
         const data = doc.data();
@@ -84,7 +92,13 @@ export async function GET(request: NextRequest) {
       )
       .map(({ data }) => data);
 
-    if (!hasCompleteStoredSchedule(snapshot.size, games.length)) {
+    if (
+      !hasCompleteStoredSchedule(
+        snapshot.size,
+        games.map((game) => game.eventId),
+        syncedEventIds
+      )
+    ) {
       console.log(
         `Firestore schedule was empty or incomplete for week ${week}, year ${year}; fetching from ESPN`
       );
@@ -132,7 +146,14 @@ async function fetchFromESPN(year: number, week: number) {
   if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
 
   const data = (await response.json()) as ESPNScoreboard;
-  if (!isMatchingSchedule(data, selection)) {
+  const responseStatus = getScheduleResponseStatus(data, selection);
+  if (responseStatus === "unavailable") {
+    return NextResponse.json(
+      { error: "The requested NFL schedule is not available yet." },
+      { status: 404 }
+    );
+  }
+  if (responseStatus === "invalid") {
     throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
   }
 

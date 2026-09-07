@@ -1,7 +1,12 @@
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { normalizeESPNGame } from "./lib/espn-data";
-import {assertMatchingSchedule, buildScoreboardUrl, getScheduleRequest} from "./lib/nfl-season";
+import {
+  assertMatchingSchedule,
+  buildScoreboardUrl,
+  getScheduleRequest,
+  setScheduleSync,
+} from "./lib/nfl-season";
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -97,6 +102,7 @@ export const forceUpdateWeek = onCall(async (request) => {
     
     // Commit all updates
     await batch.commit();
+    await setScheduleSync(db, selection, events.map((event: {id: string}) => event.id));
     
     // Update the last update timestamp
     await db.collection("config").doc("lastGameUpdate").set({

@@ -3,6 +3,7 @@ import {
   buildESPNScoreboardUrl,
   getNFLSeasonYear,
   getScheduleRequest,
+  isMatchingSchedule,
   resolveNFLWeekFromCalendar,
   type ESPNScoreboard,
 } from "@/lib/nfl-season";
@@ -10,12 +11,16 @@ import {
 export const revalidate = 300;
 
 async function fetchSeasonCalendar(year: number) {
-  const response = await fetch(
-    buildESPNScoreboardUrl(getScheduleRequest(year, 1)),
-    { next: { revalidate } }
-  );
+  const selection = getScheduleRequest(year, 1);
+  const response = await fetch(buildESPNScoreboardUrl(selection), {
+    next: { revalidate },
+  });
   if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
-  return (await response.json()) as ESPNScoreboard;
+  const data = (await response.json()) as ESPNScoreboard;
+  if (!isMatchingSchedule(data, selection)) {
+    throw new Error("ESPN did not return the authoritative Week 1 schedule");
+  }
+  return data;
 }
 
 export async function GET() {

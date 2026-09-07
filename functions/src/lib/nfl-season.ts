@@ -1,3 +1,5 @@
+import * as admin from "firebase-admin";
+
 const ESPN_API_URL =
   "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 
@@ -70,21 +72,47 @@ export function resolveCurrentWeek(data: {
   return {year, week: 1, seasonType: 2, espnWeek: 1};
 }
 
+export async function setScheduleSync(
+  db: admin.firestore.Firestore,
+  selection: ScheduleSelection,
+  eventIds: string[]
+): Promise<void> {
+  if (eventIds.length === 0) return;
+  const now = admin.firestore.Timestamp.now();
+  await db.collection("cache").doc(
+    `schedule-sync-${selection.year}-${selection.week}`
+  ).set({
+    timestamp: now,
+    expiresAt: admin.firestore.Timestamp.fromMillis(
+      now.toMillis() + 7 * 24 * 60 * 60 * 1000
+    ),
+    eventIds: [...eventIds].sort(),
+    seasonType: selection.seasonType,
+    espnWeek: selection.espnWeek,
+    week: selection.week,
+    year: selection.year,
+  });
+}
+
 export function assertMatchingSchedule(
   data: ScoreboardIdentity,
   selection: ScheduleSelection
 ): void {
   const events = data.events || [];
-  const matches =
+  const metadataMatches =
     data.season?.year === selection.year &&
     data.season?.type === selection.seasonType &&
-    data.week?.number === selection.espnWeek &&
-    events.length > 0 &&
-    events.every(
+    data.week?.number === selection.espnWeek;
+  if (!metadataMatches) throw new Error("ESPN returned the wrong season or week");
+  if (events.length === 0) throw new Error("ESPN schedule is not available yet");
+  if (
+    !events.every(
       (event) =>
         event.season?.year === selection.year &&
         event.season?.type === selection.seasonType &&
         event.week?.number === selection.espnWeek
-    );
-  if (!matches) throw new Error("ESPN returned the wrong season or week");
+    )
+  ) {
+    throw new Error("ESPN returned the wrong season or week");
+  }
 }
