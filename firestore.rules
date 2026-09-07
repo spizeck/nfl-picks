@@ -21,10 +21,8 @@ service cloud.firestore {
       allow read: if request.auth != null;
       // Users can update their own profile
       allow update: if request.auth != null && request.auth.uid == userId;
-      // Users can create their own profile after authentication
-      allow create: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.data.uid == userId;
+      // Only backend can create user documents
+      allow create: if false;
       allow delete: if false;
       
       // Season stats - users can read their own, all users can read others for leaderboard
