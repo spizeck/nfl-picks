@@ -181,6 +181,19 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
       (gameId) => picks[gameId] !== savedPicks[gameId]
     );
 
+  useEffect(() => {
+    document.documentElement.dataset.hasUnsavedPicks = hasUnsavedChanges.toString();
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      delete document.documentElement.dataset.hasUnsavedPicks;
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
   const handlePickChange = (gameId: string, side: "away" | "home") => {
     setPicks((prev) => ({
       ...prev,

@@ -1,21 +1,26 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+| Version | Supported |
+| --- | --- |
+| 1.1.x | Yes |
+| 1.0.x | Critical fixes only |
+| < 1.0 | No |
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+Report security issues privately through the repository owner or GitHub’s private vulnerability-reporting feature when enabled. Do not include API keys, service-account keys, ID tokens, Vercel bypass tokens, user data, or exploit details in a public issue.
 
-Use this section to tell people how to report a vulnerability.
+Include the affected version, reproduction steps, impact, and any suggested mitigation. Rotate any credential that is accidentally exposed before continuing investigation.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+## Operational safeguards
+
+- Client Firebase configuration and Firebase Admin configuration must target the same environment.
+- Production and staging use separate Firebase projects and service accounts.
+- Google sign-in domains are explicitly authorized in the matching Firebase project.
+- Firebase ID tokens are verified server-side before profile or pick writes.
+- Picks are locked server-side at kickoff; client controls are not the security boundary.
+- Service workers must not cache authentication, user, pick, schedule, score, or other API responses.
+- Offline writes and background pick submission are intentionally unsupported.
+- Production data repair and destructive Firestore operations require separate approval and a verified backup/dry-run plan.
