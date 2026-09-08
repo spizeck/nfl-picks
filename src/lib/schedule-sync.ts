@@ -45,8 +45,14 @@ export async function synchronizeSchedule(
       games.push({ ...normalizeESPNGame(event), week, year });
     } catch (error) {
       invalidEventCount++;
-      console.error(`Failed to normalize ESPN event ${event.id}:`, error);
+      const reason = error instanceof Error ? error.message : "Unknown normalization error";
+      console.error(`Failed to normalize ESPN event ${event.id}: ${reason}`);
     }
+  }
+  if (invalidEventCount > 0) {
+    throw new ScheduleNormalizationError(
+      `ESPN returned ${invalidEventCount} malformed event${invalidEventCount === 1 ? "" : "s"}; retry schedule synchronization.`
+    );
   }
 
   const batch = adminDb.batch();
@@ -58,11 +64,6 @@ export async function synchronizeSchedule(
     );
   }
   await batch.commit();
-  if (invalidEventCount > 0) {
-    throw new ScheduleNormalizationError(
-      `ESPN returned ${invalidEventCount} malformed event${invalidEventCount === 1 ? "" : "s"}; schedule synchronization is incomplete.`
-    );
-  }
   if (options.afterCommit) {
     await options.afterCommit(events);
   } else {

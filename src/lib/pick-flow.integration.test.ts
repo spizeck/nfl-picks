@@ -130,7 +130,7 @@ test("a fresh schedule can be loaded, picked, and reloaded without pre-seeded ga
   assert.equal(reloaded.data()?.selectedTeam, "home");
 });
 
-test("malformed ESPN events do not discard valid games or mark a partial sync complete", async () => {
+test("one malformed ESPN event prevents all writes and completeness updates", async () => {
   const memory = new MemoryFirestore();
   const db = memory as unknown as FirebaseFirestore.Firestore;
   const response = structuredClone(scoreboard);
@@ -155,7 +155,8 @@ test("malformed ESPN events do not discard valid games or mark a partial sync co
     ScheduleNormalizationError
   );
 
-  assert.equal(memory.records.has("games/game-2"), true);
+  assert.equal(memory.records.size, 0);
+  assert.equal(memory.records.has("games/game-2"), false);
   assert.equal(memory.records.has("games/malformed-game"), false);
   assert.equal(markedComplete, false);
 });
