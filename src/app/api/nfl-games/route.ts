@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
-import { normalizeESPNGame, type NormalizedGame } from "@/lib/espn-data";
+import { getCachedSchedule } from "@/lib/espn-cache";
 import {
-  getCachedSchedule,
-  setCachedSchedule,
-  setScheduleSync,
-} from "@/lib/espn-cache";
-import {
-  buildESPNScoreboardUrl,
-  getScheduleRequest,
-  getScheduleResponseStatus,
-  type ESPNScoreboard,
-} from "@/lib/nfl-season";
+  ScheduleUnavailableError,
+  synchronizeSchedule,
+} from "@/lib/schedule-sync";
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,8 +25,10 @@ export async function GET(request: NextRequest) {
     const adminDb = getAdminDb();
 
     if (!adminDb) {
-      console.warn("Firebase Admin not configured, fetching directly from ESPN");
-      return await fetchFromESPN(yearNumber, weekNumber);
+      return NextResponse.json(
+        { error: "Schedule storage is temporarily unavailable." },
+        { status: 503 }
+      );
     }
 
     const cachedSchedule = await getCachedSchedule(yearNumber, weekNumber);
@@ -45,92 +39,25 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`Fetching fresh schedule from ESPN for week ${week}, year ${year}`);
-    const selection = getScheduleRequest(yearNumber, weekNumber);
-    const espnUrl = buildESPNScoreboardUrl(selection);
-    const response = await fetch(espnUrl, { next: { revalidate: 300 } });
-
-    if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
-
-    const data = (await response.json()) as ESPNScoreboard;
-    const responseStatus = getScheduleResponseStatus(data, selection);
-    if (responseStatus === "unavailable") {
-      return NextResponse.json(
-        { error: "The requested NFL schedule is not available yet." },
-        { status: 404 }
-      );
-    }
-    if (responseStatus === "invalid") {
-      throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
-    }
-    const events = data.events || [];
-
-    const normalizedGames: (NormalizedGame & { week: number; year: number })[] = [];
-
-    for (const event of events) {
-      try {
-        const normalized = normalizeESPNGame(event);
-        normalizedGames.push({
-          ...normalized,
-          week: weekNumber,
-          year: yearNumber,
-        });
-      } catch (error) {
-        console.error(`Error normalizing event ${event.id}:`, error);
-      }
-    }
-
-    const batch = adminDb.batch();
-
-    for (const game of normalizedGames) {
-      const gameRef = adminDb.collection("games").doc(game.eventId);
-      batch.set(
-        gameRef,
-        {
-          ...game,
-          lastUpdated: Timestamp.now(),
-        },
-        { merge: true }
-      );
-    }
-
-    await batch.commit();
-    await Promise.all([
-      setCachedSchedule(yearNumber, weekNumber, events),
-      setScheduleSync(yearNumber, weekNumber, events),
-    ]);
+    const { events, games } = await synchronizeSchedule(
+      adminDb,
+      yearNumber,
+      weekNumber
+    );
 
     console.log(
-      `Cached ${events.length} events and ${normalizedGames.length} games for week ${week}, year ${year}`
+      `Cached ${events.length} events and ${games.length} games for week ${week}, year ${year}`
     );
 
     return NextResponse.json(events);
   } catch (error) {
     console.error("Error fetching NFL games:", error);
+    if (error instanceof ScheduleUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     return NextResponse.json(
-      { error: "Failed to fetch NFL games" },
-      { status: 500 }
+      { error: "Failed to synchronize the requested NFL schedule." },
+      { status: 502 }
     );
   }
-}
-
-async function fetchFromESPN(year: number, week: number) {
-  const selection = getScheduleRequest(year, week);
-  const response = await fetch(buildESPNScoreboardUrl(selection), {
-    next: { revalidate: 300 },
-  });
-
-  if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
-
-  const data = (await response.json()) as ESPNScoreboard;
-  const responseStatus = getScheduleResponseStatus(data, selection);
-  if (responseStatus === "unavailable") {
-    return NextResponse.json(
-      { error: "The requested NFL schedule is not available yet." },
-      { status: 404 }
-    );
-  }
-  if (responseStatus === "invalid") {
-    throw new Error(`ESPN returned the wrong season or week for ${year}/${week}`);
-  }
-  return NextResponse.json(data.events || []);
 }

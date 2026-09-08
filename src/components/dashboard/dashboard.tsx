@@ -82,6 +82,9 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
 
     const fetchGames = async () => {
       setLoading(true);
+      setGames([]);
+      setPicks({});
+      setSavedPicks({});
       try {
         const response = await fetch(
           `/api/games?week=${selectedWeek}&year=${currentYear}`
