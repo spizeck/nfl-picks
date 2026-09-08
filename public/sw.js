@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "nfl-picks-static-";
-const CACHE_NAME = `${CACHE_PREFIX}v1.1.0`;
+const CACHE_NAME = `${CACHE_PREFIX}v1.1.0-r2`;
 const STATIC_ASSETS = ["/offline.html", "/manifest.webmanifest", "/icon.svg", "/maskable-icon.svg"];
 
 self.addEventListener("install", (event) => {
