@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Timestamp } from "firebase-admin/firestore";
 import { saveValidatedPick } from "./pick-storage";
-import { synchronizeSchedule } from "./schedule-sync";
+import {
+  ScheduleNormalizationError,
+  synchronizeSchedule,
+} from "./schedule-sync";
 import type { ESPNScoreboard } from "./nfl-season";
 
 class MemoryDocument {
@@ -125,4 +128,34 @@ test("a fresh schedule can be loaded, picked, and reloaded without pre-seeded ga
     .get();
   assert.equal(reloaded.exists, true);
   assert.equal(reloaded.data()?.selectedTeam, "home");
+});
+
+test("malformed ESPN events do not discard valid games or mark a partial sync complete", async () => {
+  const memory = new MemoryFirestore();
+  const db = memory as unknown as FirebaseFirestore.Firestore;
+  const response = structuredClone(scoreboard);
+  response.events!.push({
+    id: "malformed-game",
+    season: { year: 2026, type: 2 },
+    week: { number: 2 },
+  } as never);
+  let markedComplete = false;
+
+  await assert.rejects(
+    synchronizeSchedule(db, 2026, 2, {
+      fetchImpl: (async () =>
+        new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })) as typeof fetch,
+      afterCommit: async () => {
+        markedComplete = true;
+      },
+    }),
+    ScheduleNormalizationError
+  );
+
+  assert.equal(memory.records.has("games/game-2"), true);
+  assert.equal(memory.records.has("games/malformed-game"), false);
+  assert.equal(markedComplete, false);
 });

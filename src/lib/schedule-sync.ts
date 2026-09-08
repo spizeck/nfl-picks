@@ -9,6 +9,7 @@ import {
 } from "./nfl-season";
 
 export class ScheduleUnavailableError extends Error {}
+export class ScheduleNormalizationError extends Error {}
 
 interface ScheduleSyncOptions {
   fetchImpl?: typeof fetch;
@@ -37,11 +38,17 @@ export async function synchronizeSchedule(
   }
 
   const events = data.events || [];
-  const games = events.map((event) => ({
-    ...normalizeESPNGame(event),
-    week,
-    year,
-  }));
+  const games: Array<NormalizedGame & { week: number; year: number }> = [];
+  let invalidEventCount = 0;
+  for (const event of events) {
+    try {
+      games.push({ ...normalizeESPNGame(event), week, year });
+    } catch (error) {
+      invalidEventCount++;
+      console.error(`Failed to normalize ESPN event ${event.id}:`, error);
+    }
+  }
+
   const batch = adminDb.batch();
   for (const game of games) {
     batch.set(
@@ -51,6 +58,11 @@ export async function synchronizeSchedule(
     );
   }
   await batch.commit();
+  if (invalidEventCount > 0) {
+    throw new ScheduleNormalizationError(
+      `ESPN returned ${invalidEventCount} malformed event${invalidEventCount === 1 ? "" : "s"}; schedule synchronization is incomplete.`
+    );
+  }
   if (options.afterCommit) {
     await options.afterCommit(events);
   } else {
