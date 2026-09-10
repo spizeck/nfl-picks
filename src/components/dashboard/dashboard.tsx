@@ -29,7 +29,7 @@ interface DashboardProps {
   onWeekChange: (week: number) => void;
 }
 
-export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
+export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) {
   // Resolved on the client only (via the effect below) to avoid deriving
   // the year from Date() during render, which could differ between the
   // server and client around year boundaries.
@@ -304,7 +304,11 @@ export function Dashboard({ selectedWeek, onWeekChange }: DashboardProps) {
         )}
       </div>
 
-      <LeaderboardCard selectedWeek={selectedWeek} selectedYear={currentYear} />
+      <LeaderboardCard
+        selectedWeek={selectedWeek}
+        selectedYear={currentYear}
+        currentUserId={user.uid}
+      />
 
       <div>
         {games.map((game) => (

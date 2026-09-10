@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,15 +9,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { getFirestoreDb } from "@/lib/firebase";
+import {
+  getDisplayedLeaderboard,
+  rankLeaderboard,
+  type LeaderboardEntry,
+  type LeaderboardSort,
+} from "@/lib/leaderboard-ranking";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-
-interface LeaderboardEntry {
-  uid: string;
-  displayName: string;
-  wins: number;
-  losses: number;
-  winPercentage: number;
-}
 
 type TimePeriod = "week" | "season" | "allTime";
 
@@ -26,6 +24,7 @@ interface LeaderboardCardProps {
   // The current season year, resolved by the parent. `null` means it
   // hasn't been resolved yet, in which case we simply wait.
   selectedYear: number | null;
+  currentUserId: string;
 }
 
 // Debounce fetches so rapidly toggling between time periods (or other
@@ -35,11 +34,12 @@ const FETCH_DEBOUNCE_MS = 300;
 export function LeaderboardCard({
   selectedWeek,
   selectedYear,
+  currentUserId,
 }: LeaderboardCardProps) {
   const [open, setOpen] = useState(true);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<"wins" | "percentage">("percentage");
+  const [sortBy, setSortBy] = useState<LeaderboardSort>("percentage");
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("season");
   const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,17 +146,13 @@ export function LeaderboardCard({
     return () => clearTimeout(timeoutId);
   }, [timePeriod, selectedWeek, selectedYear]);
 
-  const sortedLeaderboard = [...leaderboard].sort((a, b) => {
-    if (sortBy === "wins") {
-      return b.wins - a.wins;
-    }
-    return b.winPercentage - a.winPercentage;
-  });
-
-  // Limit to top 10 unless "Show All" is enabled
-  const displayedLeaderboard = showAll
-    ? sortedLeaderboard
-    : sortedLeaderboard.slice(0, 10);
+  const sortedLeaderboard = rankLeaderboard(leaderboard, sortBy);
+  const displayedLeaderboard = getDisplayedLeaderboard(
+    sortedLeaderboard,
+    currentUserId,
+    showAll
+  );
+  const hasHiddenEntries = displayedLeaderboard.length < sortedLeaderboard.length;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -211,18 +207,6 @@ export function LeaderboardCard({
                   All Time
                 </Button>
               </div>
-              {sortedLeaderboard.length > 10 && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setShowAll(!showAll)}
-                  className="font-semibold text-xs"
-                >
-                  {showAll
-                    ? "Show Top 10"
-                    : `Show All (${sortedLeaderboard.length})`}
-                </Button>
-              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -250,38 +234,54 @@ export function LeaderboardCard({
               </div>
             ) : (
               <div className="space-y-2">
-                {displayedLeaderboard.map((entry, index) => (
-                  <div
-                    key={entry.uid}
-                    className="flex items-center justify-between p-3 hover:bg-muted transition-colors border-b last:border-b-0"
-                  >
-                    <div className="flex items-center gap-4">
+                {displayedLeaderboard.map((entry) => (
+                  <Fragment key={entry.uid}>
+                    {entry.separated && (
                       <div
-                        className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
-                          index === 0
-                            ? "bg-yellow-500 text-yellow-950"
-                            : index === 1
-                            ? "bg-gray-400 text-gray-950"
-                            : index === 2
-                            ? "bg-orange-600 text-orange-950"
-                            : "bg-muted text-muted-foreground"
-                        }`}
+                        aria-label="Rankings omitted"
+                        className="border-t border-dashed pt-2 text-center text-muted-foreground"
                       >
-                        {index + 1}
+                        ···
                       </div>
-                      <span className="font-semibold text-base">
-                        {entry.displayName}
-                      </span>
+                    )}
+                    <div
+                      className={`flex items-center justify-between gap-2 p-3 hover:bg-muted transition-colors border-b last:border-b-0 ${
+                        entry.uid === currentUserId ? "bg-muted/50" : ""
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                        <div
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                            entry.rank === 1
+                              ? "bg-yellow-500 text-yellow-950"
+                              : entry.rank === 2
+                              ? "bg-gray-400 text-gray-950"
+                              : entry.rank === 3
+                              ? "bg-orange-600 text-orange-950"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {entry.rank}
+                        </div>
+                        <span className="truncate text-sm font-semibold sm:text-base">
+                          {entry.displayName}
+                          {entry.uid === currentUserId && (
+                            <span className="ml-1 text-xs font-normal text-muted-foreground">
+                              (You)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2 text-xs sm:gap-4 sm:text-sm">
+                        <span className="text-muted-foreground font-medium">
+                          {entry.wins}W - {entry.losses}L
+                        </span>
+                        <span className="min-w-[3.25rem] text-right text-sm font-bold sm:text-base">
+                          {entry.winPercentage.toFixed(1)}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-muted-foreground font-medium">
-                        {entry.wins}W - {entry.losses}L
-                      </span>
-                      <span className="font-bold text-base min-w-50px text-right">
-                        {entry.winPercentage.toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
+                  </Fragment>
                 ))}
                 {error ? (
                   <p role="alert" className="text-center text-destructive py-4">
@@ -292,6 +292,17 @@ export function LeaderboardCard({
                     No leaderboard data available yet
                   </p>
                 ) : null}
+                {(hasHiddenEntries || showAll) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowAll(!showAll)}
+                    className="w-full font-semibold"
+                    aria-expanded={showAll}
+                  >
+                    {showAll ? "Show less" : "View full leaderboard"}
+                  </Button>
+                )}
               </div>
             )}
           </div>
