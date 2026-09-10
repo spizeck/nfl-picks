@@ -58,6 +58,20 @@ test("missing and non-numeric final scores are rejected", () => {
     }),
     false
   );
+  assert.equal(
+    isExpectedSeattleWin({
+      ...completedGame,
+      away: { id: "17", name: "New England Patriots", score: null },
+    }),
+    false
+  );
+  assert.equal(
+    isExpectedSeattleWin({
+      ...completedGame,
+      away: { id: "17", name: "New England Patriots", score: "" },
+    }),
+    false
+  );
 });
 
 test("corrected win is included in weekly derived stats", () => {

@@ -41,12 +41,22 @@ interface GameData {
   status?: { state?: unknown };
 }
 
+function parseScore(score: unknown): number {
+  if (
+    (typeof score !== "string" && typeof score !== "number") ||
+    (typeof score === "string" && score.trim() === "")
+  ) {
+    return Number.NaN;
+  }
+  return Number(score);
+}
+
 export function isExpectedSeattleWin(gameData: GameData): boolean {
   const expectedKickoff = Date.parse("2026-09-10T00:20Z");
   const storedKickoff =
     typeof gameData.date === "string" ? Date.parse(gameData.date) : Number.NaN;
-  const homeScore = Number(gameData.home?.score);
-  const awayScore = Number(gameData.away?.score);
+  const homeScore = parseScore(gameData.home?.score);
+  const awayScore = parseScore(gameData.away?.score);
 
   return (
     gameData.year === YEAR &&
