@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/nfl-season.test.ts src/lib/pick-flow.integration.test.ts src/lib/pwa-assets.test.ts"
+    "test": "tsx --test src/lib/nfl-season.test.ts src/lib/pick-flow.integration.test.ts src/lib/pwa-assets.test.ts scripts/data-corrections/2026-week-1-missed-picks.test.ts",
+    "correct:2026-week1-missed-picks": "tsx --env-file=.env.local scripts/data-corrections/2026-week-1-missed-picks.ts",
+    "correct:2026-week1-missed-picks:apply": "tsx --env-file=.env.local scripts/data-corrections/2026-week-1-missed-picks.ts --apply"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
