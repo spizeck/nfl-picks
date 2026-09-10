@@ -32,6 +32,38 @@ interface Stats {
   total: number;
 }
 
+interface GameData {
+  year?: unknown;
+  week?: unknown;
+  date?: unknown;
+  away?: { id?: unknown; name?: unknown; score?: unknown };
+  home?: { id?: unknown; name?: unknown; score?: unknown };
+  status?: { state?: unknown };
+}
+
+export function isExpectedSeattleWin(gameData: GameData): boolean {
+  const expectedKickoff = Date.parse("2026-09-10T00:20Z");
+  const storedKickoff =
+    typeof gameData.date === "string" ? Date.parse(gameData.date) : Number.NaN;
+  const homeScore = Number(gameData.home?.score);
+  const awayScore = Number(gameData.away?.score);
+
+  return (
+    gameData.year === YEAR &&
+    gameData.week === WEEK &&
+    Number.isFinite(storedKickoff) &&
+    storedKickoff === expectedKickoff &&
+    gameData.away?.id === "17" &&
+    gameData.away?.name === "New England Patriots" &&
+    gameData.home?.id === SELECTED_TEAM &&
+    gameData.home?.name === "Seattle Seahawks" &&
+    gameData.status?.state === "post" &&
+    Number.isFinite(homeScore) &&
+    Number.isFinite(awayScore) &&
+    homeScore > awayScore
+  );
+}
+
 export function deriveStats(picks: PickData[]): Stats {
   const stats = { wins: 0, losses: 0, pending: 0, total: picks.length };
   for (const pick of picks) {
@@ -110,17 +142,7 @@ async function run(apply: boolean) {
   if (!game.exists) throw new Error(`Expected game ${GAME_ID} does not exist`);
 
   const gameData = game.data()!;
-  if (
-    gameData.year !== YEAR ||
-    gameData.week !== WEEK ||
-    gameData.date !== "2026-09-10T00:20Z" ||
-    gameData.away?.id !== "17" ||
-    gameData.away?.name !== "New England Patriots" ||
-    gameData.home?.id !== SELECTED_TEAM ||
-    gameData.home?.name !== "Seattle Seahawks" ||
-    gameData.status?.state !== "post" ||
-    Number(gameData.home?.score) <= Number(gameData.away?.score)
-  ) {
+  if (!isExpectedSeattleWin(gameData)) {
     throw new Error(`Game ${GAME_ID} does not match the expected completed Seattle win`);
   }
 

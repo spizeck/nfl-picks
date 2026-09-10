@@ -1,6 +1,64 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { deriveSeasonStats, deriveStats } from "./2026-week-1-missed-picks";
+import {
+  deriveSeasonStats,
+  deriveStats,
+  isExpectedSeattleWin,
+} from "./2026-week-1-missed-picks";
+
+const completedGame = {
+  year: 2026,
+  week: 1,
+  date: "2026-09-10T00:20Z",
+  away: { id: "17", name: "New England Patriots", score: "10" },
+  home: { id: "26", name: "Seattle Seahawks", score: "13" },
+  status: { state: "post" },
+};
+
+test("equivalent kickoff ISO timestamps are accepted", () => {
+  assert.equal(
+    isExpectedSeattleWin({ ...completedGame, date: "2026-09-10T00:20:00Z" }),
+    true
+  );
+  assert.equal(
+    isExpectedSeattleWin({
+      ...completedGame,
+      date: "2026-09-09T20:20:00-04:00",
+    }),
+    true
+  );
+});
+
+test("missing and non-numeric final scores are rejected", () => {
+  assert.equal(
+    isExpectedSeattleWin({
+      ...completedGame,
+      home: { id: "26", name: "Seattle Seahawks" },
+    }),
+    false
+  );
+  assert.equal(
+    isExpectedSeattleWin({
+      ...completedGame,
+      away: { id: "17", name: "New England Patriots" },
+    }),
+    false
+  );
+  assert.equal(
+    isExpectedSeattleWin({
+      ...completedGame,
+      home: { id: "26", name: "Seattle Seahawks", score: "final" },
+    }),
+    false
+  );
+  assert.equal(
+    isExpectedSeattleWin({
+      ...completedGame,
+      away: { id: "17", name: "New England Patriots", score: "unknown" },
+    }),
+    false
+  );
+});
 
 test("corrected win is included in weekly derived stats", () => {
   const stats = deriveStats([
