@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getDisplayedLeaderboard,
+  hasExpandableLeaderboard,
   rankLeaderboard,
   type LeaderboardEntry,
 } from "./leaderboard-ranking";
@@ -48,11 +49,17 @@ test("fewer than three users displays everyone without separation", () => {
 });
 
 test("show all and show less toggle between full and compact rows", () => {
+  assert.equal(hasExpandableLeaderboard(ranked.length), true);
   assert.equal(getDisplayedLeaderboard(ranked, "user-7", true).length, 7);
   assert.deepEqual(
     getDisplayedLeaderboard(ranked, "user-7", false).map((entry) => entry.rank),
     [1, 2, 3, 7]
   );
+});
+
+test("expanded state does not show a redundant toggle for three or fewer users", () => {
+  assert.equal(hasExpandableLeaderboard(3), false);
+  assert.equal(hasExpandableLeaderboard(2), false);
 });
 
 test("week, season, and all-time datasets each recalculate compact ranking", () => {

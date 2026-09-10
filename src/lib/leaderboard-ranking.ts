@@ -26,6 +26,10 @@ export function rankLeaderboard(
     .map((entry, index) => ({ ...entry, rank: index + 1, separated: false }));
 }
 
+export function hasExpandableLeaderboard(totalEntries: number): boolean {
+  return totalEntries > 3;
+}
+
 export function getDisplayedLeaderboard(
   leaderboard: RankedLeaderboardEntry[],
   currentUserId: string,

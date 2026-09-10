@@ -11,6 +11,7 @@ import {
 import { getFirestoreDb } from "@/lib/firebase";
 import {
   getDisplayedLeaderboard,
+  hasExpandableLeaderboard,
   rankLeaderboard,
   type LeaderboardEntry,
   type LeaderboardSort,
@@ -292,7 +293,8 @@ export function LeaderboardCard({
                     No leaderboard data available yet
                   </p>
                 ) : null}
-                {(hasHiddenEntries || showAll) && (
+                {hasExpandableLeaderboard(sortedLeaderboard.length) &&
+                  (hasHiddenEntries || showAll) && (
                   <Button
                     size="sm"
                     variant="ghost"
