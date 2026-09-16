@@ -16,6 +16,10 @@ For a Vercel preview:
 
 Firebase popup sign-in uses the configured `authDomain`. Do not switch to redirect auth merely to silence COOP console warnings; redirect flows require separate hosting/storage and callback validation.
 
+## Scheduled email (Vercel Cron + Resend)
+
+`vercel.json` registers two cron jobs against the Next.js app: `/api/cron/pick-reminder` (Thursday 00:00 UTC; the route itself verifies Wednesday 5:00 PM `America/Phoenix` before sending) and `/api/cron/weekly-recap` (daily; sends once the most recent week is fully final). They require `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_EMAIL_DOMAIN`, and `NEXT_PUBLIC_APP_URL` in the Vercel environment. Delivery is idempotent through `emailSends` Firestore records, so manual re-invocation is safe.
+
 ## Required checks
 
 Run from the repository root:

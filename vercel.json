@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/pick-reminder",
+      "schedule": "0 0 * * 4"
+    },
+    {
+      "path": "/api/cron/weekly-recap",
+      "schedule": "0 13 * * *"
+    }
+  ]
+}

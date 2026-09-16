@@ -25,6 +25,10 @@ export interface UserProfile {
   displayName: string;
   photoURL: string;
   email: string;
+  emailPreferences?: {
+    weeklyRecap?: boolean;
+    pickReminders?: boolean;
+  };
 }
 
 export interface PickWithUserInfo {
