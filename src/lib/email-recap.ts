@@ -254,7 +254,8 @@ export function buildWeeklyRecapModel(input: BuildRecapInput): WeeklyRecapModel 
     totalPlayers: input.seasonLeaderboard.length,
     rankDelta,
     previousRank: hadPriorGames ? previousRank : null,
-    topThree: input.seasonLeaderboard.slice(0, 3).map((entry) => ({
+    // Everyone holding a podium rank (1-3); a tie at #3 shows both players.
+    topThree: input.seasonLeaderboard.filter((entry) => entry.rank <= 3).map((entry) => ({
       rank: entry.rank,
       displayName: entry.displayName,
       wins: entry.wins,

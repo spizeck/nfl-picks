@@ -310,3 +310,74 @@ test("weekly recap model derives records, ranks, and movement", () => {
   assert.equal(model.results[0].result, "win");
   assert.equal(model.results[0].scoreText, "10–24");
 });
+
+test("recap movement uses competition ranks across a tie boundary", () => {
+  const users = [
+    { uid: "bob", displayName: "Bob", seasonWins: 13, seasonLosses: 3, weekWins: 1, weekLosses: 0 },
+    { uid: "carol", displayName: "Carol", seasonWins: 10, seasonLosses: 6, weekWins: 0, weekLosses: 1 },
+    { uid: "frank", displayName: "Frank", seasonWins: 9, seasonLosses: 8, weekWins: 0, weekLosses: 2 },
+    { uid: "alice", displayName: "Alice", seasonWins: 10, seasonLosses: 6, weekWins: 3, weekLosses: 0 },
+    { uid: "dave", displayName: "Dave", seasonWins: 8, seasonLosses: 8, weekWins: 0, weekLosses: 0 },
+    { uid: "eve", displayName: "Eve", seasonWins: 4, seasonLosses: 11, weekWins: 0, weekLosses: 1 },
+  ];
+  const leaderboard = buildLeaderboardContext(users);
+
+  const model = buildWeeklyRecapModel({
+    userId: "alice",
+    displayName: "Alice",
+    year: 2026,
+    week: 3,
+    appUrl: "https://picks.example.com",
+    games: [],
+    picks: [],
+    pickCounts: new Map(),
+    seasonLeaderboard: leaderboard.season,
+    previousSeasonLeaderboard: leaderboard.previous,
+    weeklyLeaderboard: leaderboard.weekly,
+  });
+
+  // Season: bob .813 #1; alice and carol tie at .625 for #2.
+  assert.equal(model.overallRank, 2);
+  // Previous: alice was #4 outright, so the climb is two real places.
+  assert.equal(model.previousRank, 4);
+  assert.equal(model.rankDelta, 2);
+  assert.deepEqual(
+    model.topThree.map((r) => r.rank),
+    [1, 2, 2]
+  );
+});
+
+test("recap top three includes everyone tied at rank 3", () => {
+  const users = [
+    { uid: "a", displayName: "A", seasonWins: 14, seasonLosses: 2, weekWins: 0, weekLosses: 0 },
+    { uid: "b", displayName: "B", seasonWins: 12, seasonLosses: 4, weekWins: 0, weekLosses: 0 },
+    { uid: "c", displayName: "C", seasonWins: 10, seasonLosses: 6, weekWins: 0, weekLosses: 0 },
+    { uid: "d", displayName: "D", seasonWins: 10, seasonLosses: 6, weekWins: 0, weekLosses: 0 },
+    { uid: "e", displayName: "E", seasonWins: 6, seasonLosses: 10, weekWins: 0, weekLosses: 0 },
+  ];
+  const leaderboard = buildLeaderboardContext(users);
+
+  const model = buildWeeklyRecapModel({
+    userId: "e",
+    displayName: "E",
+    year: 2026,
+    week: 3,
+    appUrl: "https://picks.example.com",
+    games: [],
+    picks: [],
+    pickCounts: new Map(),
+    seasonLeaderboard: leaderboard.season,
+    previousSeasonLeaderboard: leaderboard.previous,
+    weeklyLeaderboard: leaderboard.weekly,
+  });
+
+  // Carol and Dave share #3, so the podium lists four rows: 1, 2, 3, 3.
+  assert.deepEqual(
+    model.topThree.map((r) => r.rank),
+    [1, 2, 3, 3]
+  );
+  assert.deepEqual(
+    model.topThree.map((r) => r.displayName),
+    ["A", "B", "C", "D"]
+  );
+});
