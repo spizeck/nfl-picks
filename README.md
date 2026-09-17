@@ -9,6 +9,7 @@ NFL Picks is a Next.js 16 application for choosing NFL game winners, comparing r
 - Server-enforced kickoff locking and checked pick-save responses
 - Regular-season weeks 1–18 and postseason weeks 19–22 (Pro Bowl excluded)
 - Installable PWA with a minimal offline fallback and user-controlled updates
+- Resend-powered weekly recap and incomplete-picks reminder emails
 
 ## Stack
 
@@ -40,9 +41,24 @@ NEXT_PUBLIC_FIREBASE_APP_ID
 FIREBASE_ADMIN_PROJECT_ID
 FIREBASE_ADMIN_CLIENT_EMAIL
 FIREBASE_ADMIN_PRIVATE_KEY
+RESEND_API_KEY
+RESEND_EMAIL_DOMAIN
+CRON_SECRET
+NEXT_PUBLIC_APP_URL
 ```
 
+`RESEND_API_KEY` and `RESEND_EMAIL_DOMAIN` configure transactional email through the existing `mail.seasaba.com` Resend domain (sender `NFL Picks <picks@mail.seasaba.com>`). `CRON_SECRET` authenticates the scheduled `/api/cron/*` routes that Vercel Cron calls. `NEXT_PUBLIC_APP_URL` supplies the absolute URL for email links; on Vercel it falls back to `VERCEL_URL`.
+
 Never commit `.env.local`, service-account JSON, private keys, or Vercel bypass tokens. Preserve escaped newlines in `FIREBASE_ADMIN_PRIVATE_KEY`.
+
+## Scheduled emails
+
+Two Vercel Cron jobs in `vercel.json` drive email:
+
+- `/api/cron/pick-reminder` fires Thursday 00:00 UTC and only sends when it is Wednesday 5:00 PM `America/Phoenix`, which the route verifies from the IANA timezone rather than a fixed offset. Users with unpicked games whose kickoffs are still ahead get a reminder listing the missing matchups.
+- `/api/cron/weekly-recap` runs daily, finds the most recent week whose games are all final, and sends one recap per player who picked that week.
+
+Both jobs write `emailSends/{year}-{week}-{userId}-{type}` records claimed in a transaction before sending, and the same key is passed to Resend as its `Idempotency-Key` header. Provider rejections are retryable; once Resend accepts a message the record is reconciled to `sent` (via `accepted` if the write fails) rather than resent. The honest guarantee is at-least-once with provider-level dedupe: a crash in the narrow gap between provider acceptance and the state write can only be fully deduped while Resend retains the idempotency key. Users can toggle each email category under the mail icon in the header (`users/{uid}.emailPreferences`).
 
 ## Commands
 
@@ -91,6 +107,7 @@ Installed-app capabilities vary by browser and OS. iOS and Android standalone be
 games/{eventId}
 cache/schedule-{year}-{week}
 cache/schedule-sync-{year}-{week}
+emailSends/{year}-{week}-{userId}-{type}
 users/{uid}
 users/{uid}/seasons/{year}
 users/{uid}/seasons/{year}/weeks/{week}
