@@ -8,11 +8,16 @@
  */
 
 import {setGlobalOptions} from "firebase-functions";
-import { onGameComplete } from "./scheduled-stats-update";
-import { updateGameScores } from "./scheduled-game-update";
-import { forceUpdateWeek } from "./force-update";
-import { processCompletedGames } from "./process-completed-games";
+import {onGameComplete} from "./scheduled-stats-update";
+import {updateGameScores} from "./scheduled-game-update";
+import {forceUpdateWeek} from "./force-update";
+import {processCompletedGames} from "./process-completed-games";
 
-setGlobalOptions({ maxInstances: 10 });
+setGlobalOptions({maxInstances: 10});
 
-export { onGameComplete, updateGameScores, forceUpdateWeek, processCompletedGames };
+export {
+  onGameComplete,
+  updateGameScores,
+  forceUpdateWeek,
+  processCompletedGames,
+};

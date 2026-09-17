@@ -1,4 +1,4 @@
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 
 if (!admin.apps.length) {
@@ -119,6 +119,13 @@ export const onGameComplete = onDocumentUpdated(
   }
 );
 
+/**
+ * Recompute a user's win/loss/pending stats for a single week.
+ * @param {admin.firestore.Firestore} db Firestore instance.
+ * @param {string} userId User document ID.
+ * @param {number} year Season year.
+ * @param {number} week Week number.
+ */
 async function updateWeekStats(
   db: admin.firestore.Firestore,
   userId: string,
@@ -162,12 +169,20 @@ async function updateWeekStats(
       total: wins + losses + pending,
       lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
     },
-    { merge: true }
+    {merge: true}
   );
 
-  console.log(`Updated week ${week} stats for user ${userId}: ${wins}-${losses}`);
+  console.log(
+    `Updated week ${week} stats for user ${userId}: ${wins}-${losses}`
+  );
 }
 
+/**
+ * Recompute a user's season totals from their weekly stats.
+ * @param {admin.firestore.Firestore} db Firestore instance.
+ * @param {string} userId User document ID.
+ * @param {number} year Season year.
+ */
 async function updateSeasonStats(
   db: admin.firestore.Firestore,
   userId: string,
@@ -212,10 +227,11 @@ async function updateSeasonStats(
       weeklyRecords,
       lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
     },
-    { merge: true }
+    {merge: true}
   );
 
   console.log(
-    `Updated season ${year} stats for user ${userId}: ${totalWins}-${totalLosses}`
+    `Updated season ${year} stats for user ${userId}: ` +
+      `${totalWins}-${totalLosses}`
   );
 }

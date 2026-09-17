@@ -1,6 +1,6 @@
-import { onSchedule } from "firebase-functions/v2/scheduler";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
-import { normalizeESPNGame } from "./lib/espn-data";
+import {normalizeESPNGame} from "./lib/espn-data";
 import {
   assertMatchingSchedule,
   buildScoreboardUrl,
@@ -27,98 +27,114 @@ export const updateGameScores = onSchedule(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async (_event) => {
     console.log("Starting scheduled game score update");
-    
+
     const db = admin.firestore();
-    
+
     try {
       // First, get current week info from ESPN API
       const now = new Date();
-      const currentYear = now.getUTCMonth() <= 1 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
-      const weekInfoUrl = buildScoreboardUrl(getScheduleRequest(currentYear, 1));
-      
+      const currentYear = now.getUTCMonth() <= 1 ?
+        now.getUTCFullYear() - 1 : now.getUTCFullYear();
+      const weekInfoUrl = buildScoreboardUrl(
+        getScheduleRequest(currentYear, 1)
+      );
+
       console.log(`Fetching week info from ESPN API: ${weekInfoUrl}`);
       const weekInfoResponse = await fetch(weekInfoUrl);
-      
+
       if (!weekInfoResponse.ok) {
-        throw new Error(`Failed to fetch week info: ${weekInfoResponse.statusText}`);
+        throw new Error(
+          `Failed to fetch week info: ${weekInfoResponse.statusText}`
+        );
       }
-      
+
       const weekInfoData = await weekInfoResponse.json();
       const currentSelection = resolveCurrentWeek(weekInfoData, now);
       const currentWeek = currentSelection.week;
       const seasonType = currentSelection.seasonType;
-      
-      console.log(`Current NFL week: ${currentWeek}, year: ${currentYear}, season type: ${seasonType}`);
-      
+
+      console.log(
+        `Current NFL week: ${currentWeek}, year: ${currentYear}, ` +
+          `season type: ${seasonType}`
+      );
+
       // Allow both regular season and postseason
       if (seasonType !== 2 && seasonType !== 3) {
-        console.log(`Not in regular or postseason (type: ${seasonType}), skipping update`);
+        console.log(
+          `Not in regular or postseason (type: ${seasonType}), ` +
+            "skipping update"
+        );
         return;
       }
-      
+
       // Check if we've recently updated (within 5 minutes instead of 2)
       const lastUpdateRef = db.collection("config").doc("lastGameUpdate");
       const lastUpdateDoc = await lastUpdateRef.get();
-      
+
       if (lastUpdateDoc.exists) {
         const lastUpdateTime = lastUpdateDoc.data()?.timestamp?.toDate();
         const now = new Date();
         const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-        
+
         if (lastUpdateTime && lastUpdateTime > fiveMinutesAgo) {
           console.log("Skipping scheduled update - was performed recently");
           return;
         }
       }
-      
+
       // Fetch actual game data from ESPN API
       // For postseason, use seasontype=3 (no dates parameter needed)
       const selection = getScheduleRequest(currentYear, currentWeek);
       const espnUrl = buildScoreboardUrl(selection);
       console.log(`Fetching game data: ${espnUrl}`);
-      
+
       const response = await fetch(espnUrl);
       if (!response.ok) {
-        throw new Error(`Failed to fetch data from ESPN API: ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch data from ESPN API: ${response.statusText}`
+        );
       }
-      
+
       const data = await response.json();
       assertMatchingSchedule(data, selection);
       const events = data.events || [];
-      
+
       console.log(`Found ${events.length} games from ESPN API`);
-      
+
       // Process each game
       const batch = db.batch();
       let updatedCount = 0;
       let skippedCount = 0;
-      
+
       for (const event of events) {
         try {
           const normalizedGame = normalizeESPNGame(event);
-          
+
           // Reference to the game document
           const gameRef = db.collection("games").doc(normalizedGame.eventId);
-          
+
           // Get current game data from Firestore
           const gameDoc = await gameRef.get();
           const currentData = gameDoc.exists ? gameDoc.data() : null;
-          
+
           // Check if we need to update this game
           let needsUpdate = false;
-          
+
           if (!currentData) {
             // New game - always update
             needsUpdate = true;
           } else {
             // Check if scores or status changed
-            const awayScoreChanged = currentData.away?.score !== normalizedGame.away.score;
-            const homeScoreChanged = currentData.home?.score !== normalizedGame.home.score;
-            const statusChanged = currentData.status?.state !== normalizedGame.status.state;
-            
+            const awayScoreChanged =
+              currentData.away?.score !== normalizedGame.away.score;
+            const homeScoreChanged =
+              currentData.home?.score !== normalizedGame.home.score;
+            const statusChanged =
+              currentData.status?.state !== normalizedGame.status.state;
+
             needsUpdate = awayScoreChanged || homeScoreChanged || statusChanged;
           }
-          
+
           if (needsUpdate) {
             // Update the game with latest data
             batch.set(gameRef, {
@@ -139,38 +155,52 @@ export const updateGameScores = onSchedule(
               status: {
                 state: normalizedGame.status.state,
                 displayText: normalizedGame.status.displayText,
-                ...(normalizedGame.status.detail !== undefined && { detail: normalizedGame.status.detail }),
+                ...(normalizedGame.status.detail !== undefined && {
+                  detail: normalizedGame.status.detail,
+                }),
               },
               week: currentWeek,
               year: currentYear,
               lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-            }, { merge: true });
-            
-            if (currentData && currentData.status?.state !== normalizedGame.status.state) {
-              console.log(`Game ${normalizedGame.eventId} status changed from ${currentData.status?.state} to ${normalizedGame.status.state}`);
+            }, {merge: true});
+
+            if (
+              currentData &&
+              currentData.status?.state !== normalizedGame.status.state
+            ) {
+              console.log(
+                `Game ${normalizedGame.eventId} status changed from ` +
+                  `${currentData.status?.state} to ` +
+                  normalizedGame.status.state
+              );
               updatedCount++;
             }
           } else {
             skippedCount++;
           }
         } catch (error) {
-          console.error(`Error processing game ${(event as { id?: string }).id}:`, error);
+          const eventId = (event as {id?: string}).id;
+          console.error(`Error processing game ${eventId}:`, error);
         }
       }
-      
+
       // Commit all updates
       await batch.commit();
-      await setScheduleSync(db, selection, events.map((event: {id: string}) => event.id));
-      
+      const eventIds = events.map((event: {id: string}) => event.id);
+      await setScheduleSync(db, selection, eventIds);
+
       // Update the last update timestamp
       await lastUpdateRef.set({
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         week: currentWeek,
         year: currentYear,
       });
-      
-      console.log(`Successfully processed ${events.length} games (${updatedCount} with status changes, ${skippedCount} skipped)`);
-      
+
+      console.log(
+        `Successfully processed ${events.length} games ` +
+          `(${updatedCount} with status changes, ${skippedCount} skipped)`
+      );
+
       return;
     } catch (error) {
       console.error("Error in scheduled game score update:", error);
@@ -189,18 +219,19 @@ export const updateScoresNow = onSchedule(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async (_event) => {
     console.log("Running manual score update trigger");
-    
+
     // Call the same logic as the main function but bypass the throttle check
     const db = admin.firestore();
-    
+
     try {
       // Clear the last update check to force an update
       await db.collection("config").doc("lastGameUpdate").delete();
-      
+
       // Import and call the update logic
-      // Note: In a real implementation, you'd refactor the shared logic into a separate function
+      // Note: In a real implementation, you'd refactor the shared logic
+      // into a separate function
       console.log("Forced score update triggered");
-      
+
       // Reuse the same logic as the scheduled function
       // The handler will be called by the scheduler
     } catch (error) {
@@ -219,18 +250,19 @@ export const forceUpdateWeek17 = onSchedule(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async (_event) => {
     console.log("Force updating week 17 games");
-    
+
     const db = admin.firestore();
-    
+
     try {
       // Clear the last update check to force an update
       await db.collection("config").doc("lastGameUpdate").delete();
-      
+
       // Force update week 17
       const now = new Date();
-      const seasonYear = now.getUTCMonth() <= 1 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+      const seasonYear = now.getUTCMonth() <= 1 ?
+        now.getUTCFullYear() - 1 : now.getUTCFullYear();
       await updateWeekGames(17, seasonYear);
-      
+
       console.log("Week 17 force update completed");
     } catch (error) {
       console.error("Error in week 17 force update:", error);
@@ -238,37 +270,43 @@ export const forceUpdateWeek17 = onSchedule(
   }
 );
 
-// Helper function to update specific week games
+/**
+ * Fetch and store game data for a specific week.
+ * @param {number} week App week number.
+ * @param {number} year Season year.
+ */
 async function updateWeekGames(week: number, year: number) {
   const db = admin.firestore();
-  
+
   // Fetch game data from ESPN API
   const selection = getScheduleRequest(year, week);
   const espnUrl = buildScoreboardUrl(selection);
   console.log(`Fetching week ${week} game data from ESPN API: ${espnUrl}`);
-  
+
   const response = await fetch(espnUrl);
   if (!response.ok) {
-    throw new Error(`Failed to fetch data from ESPN API: ${response.statusText}`);
+    throw new Error(
+      `Failed to fetch data from ESPN API: ${response.statusText}`
+    );
   }
-  
+
   const data = await response.json();
   assertMatchingSchedule(data, selection);
   const events = data.events || [];
-  
+
   console.log(`Found ${events.length} games for week ${week}`);
-  
+
   // Process each game
   const batch = db.batch();
   let updatedCount = 0;
-  
+
   for (const event of events) {
     try {
       const normalizedGame = normalizeESPNGame(event);
-      
+
       // Reference to the game document
       const gameRef = db.collection("games").doc(normalizedGame.eventId);
-      
+
       // Always update for force refresh
       batch.set(gameRef, {
         eventId: normalizedGame.eventId,
@@ -288,29 +326,33 @@ async function updateWeekGames(week: number, year: number) {
         status: {
           state: normalizedGame.status.state,
           displayText: normalizedGame.status.displayText,
-          ...(normalizedGame.status.detail !== undefined && { detail: normalizedGame.status.detail }),
+          ...(normalizedGame.status.detail !== undefined && {
+            detail: normalizedGame.status.detail,
+          }),
         },
         week: week,
         year: year,
         lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-      
+      }, {merge: true});
+
       updatedCount++;
     } catch (error) {
-      console.error(`Error processing game ${(event as { id?: string }).id}:`, error);
+      const eventId = (event as {id?: string}).id;
+      console.error(`Error processing game ${eventId}:`, error);
     }
   }
-  
+
   // Commit all updates
   await batch.commit();
-  await setScheduleSync(db, selection, events.map((event: {id: string}) => event.id));
-  
+  const eventIds = events.map((event: {id: string}) => event.id);
+  await setScheduleSync(db, selection, eventIds);
+
   // Update the last update timestamp
   await db.collection("config").doc("lastGameUpdate").set({
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
     week: week,
     year: year,
   });
-  
+
   console.log(`Successfully updated ${updatedCount} games for week ${week}`);
 }
