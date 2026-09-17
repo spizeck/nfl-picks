@@ -62,17 +62,23 @@ export interface ESPNEvent {
 
 /**
  * Normalize ESPN event data into a clean game model
+ * @param {ESPNEvent} event Raw ESPN scoreboard event.
+ * @return {NormalizedGame} Normalized game document.
  */
 export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
   // Validate event structure
   if (!event.competitions || event.competitions.length === 0) {
-    throw new Error(`Invalid game data: missing competitions array for event ${event.id}`);
+    throw new Error(
+      `Invalid game data: missing competitions array for event ${event.id}`
+    );
   }
 
   const competition = event.competitions[0];
-  
+
   if (!competition.competitors || competition.competitors.length === 0) {
-    throw new Error(`Invalid game data: missing competitors for event ${event.id}`);
+    throw new Error(
+      `Invalid game data: missing competitors for event ${event.id}`
+    );
   }
 
   const competitors = competition.competitors;
@@ -82,7 +88,9 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
   const homeTeam = competitors.find((c) => c.homeAway === "home");
 
   if (!awayTeam || !homeTeam) {
-    throw new Error(`Invalid game data: missing away or home team for event ${event.id}`);
+    throw new Error(
+      `Invalid game data: missing away or home team for event ${event.id}`
+    );
   }
 
   // Determine game state
@@ -107,7 +115,7 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
     const awayScore = awayTeam.score ?? 0;
     const homeScore = homeTeam.score ?? 0;
     displayText = `${awayScore}–${homeScore}`;
-    
+
     // Add quarter/period and clock if available
     if (event.status.period && event.status.displayClock) {
       const quarter = getQuarterLabel(event.status.period);
@@ -152,6 +160,8 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
 
 /**
  * Format game time for pre-game display
+ * @param {Date} date Game start time in UTC.
+ * @return {string} Display string such as "Thu, Sep 5, 8:20 PM".
  */
 function formatGameTime(date: Date): string {
   // Format in UTC since the date from ESPN is already in UTC
@@ -162,12 +172,14 @@ function formatGameTime(date: Date): string {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    timeZone: "UTC"
+    timeZone: "UTC",
   });
 }
 
 /**
  * Get quarter label from period number
+ * @param {number} period ESPN period number (5+ = overtime).
+ * @return {string} Label such as "3rd" or "OT2".
  */
 function getQuarterLabel(period: number): string {
   if (period <= 4) {
@@ -178,6 +190,8 @@ function getQuarterLabel(period: number): string {
 
 /**
  * Get ordinal suffix for numbers (1st, 2nd, 3rd, 4th)
+ * @param {number} n Number to suffix.
+ * @return {string} Suffix such as "st", "nd", "rd", or "th".
  */
 function getOrdinalSuffix(n: number): string {
   const s = ["th", "st", "nd", "rd"];

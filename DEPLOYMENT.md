@@ -22,6 +22,8 @@ Firebase popup sign-in uses the configured `authDomain`. Do not switch to redire
 
 ## Required checks
 
+All commands run under Node 24 (see `.nvmrc`). GitHub Actions runs the same checks on every PR and push to `master` — CI never deploys.
+
 Run from the repository root:
 
 ```bash

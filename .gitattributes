@@ -1,0 +1,3 @@
+# The functions ESLint config enforces LF line endings; keep working-tree
+# files LF so linting behaves identically on Windows, macOS, and CI.
+functions/** text=auto eol=lf

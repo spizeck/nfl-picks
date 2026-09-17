@@ -10,7 +10,16 @@ export interface ScheduleSelection {
   espnWeek: number;
 }
 
-export function getScheduleRequest(year: number, week: number): ScheduleSelection {
+/**
+ * Map an app week number to ESPN scoreboard request parameters.
+ * @param {number} year Season year.
+ * @param {number} week App week (19-22 are postseason weeks).
+ * @return {ScheduleSelection} Parameters for the ESPN scoreboard API.
+ */
+export function getScheduleRequest(
+  year: number,
+  week: number
+): ScheduleSelection {
   if (week >= 19 && week <= 22) {
     return {
       year,
@@ -23,9 +32,15 @@ export function getScheduleRequest(year: number, week: number): ScheduleSelectio
   return {year, week, seasonType: 2, espnWeek: week};
 }
 
+/**
+ * Build the ESPN scoreboard URL for a schedule selection.
+ * @param {ScheduleSelection} selection Season/week selection.
+ * @return {string} Fully qualified scoreboard URL.
+ */
 export function buildScoreboardUrl(selection: ScheduleSelection): string {
-  // ESPN treats `dates` as the NFL season identifier here, including postseason
-  // games played in the following calendar year. Omitting it reintroduces rollover ambiguity.
+  // ESPN treats `dates` as the NFL season identifier here, including
+  // postseason games played in the following calendar year. Omitting it
+  // reintroduces rollover ambiguity.
   const params = new URLSearchParams({
     dates: selection.year.toString(),
     seasontype: selection.seasonType.toString(),
@@ -44,6 +59,12 @@ interface ScoreboardIdentity {
   }>;
 }
 
+/**
+ * Resolve the current NFL week from an ESPN scoreboard response.
+ * @param {object} data Scoreboard payload containing the season calendar.
+ * @param {Date} now Reference time, defaults to the current time.
+ * @return {ScheduleSelection} The current season/week selection.
+ */
 export function resolveCurrentWeek(data: {
   leagues?: Array<{
     season?: {year?: number};
@@ -61,7 +82,9 @@ export function resolveCurrentWeek(data: {
     if (seasonType !== 2 && seasonType !== 3) continue;
     for (const entry of season.entries || []) {
       if (!entry.startDate || !entry.endDate || !entry.value) continue;
-      if (now < new Date(entry.startDate) || now > new Date(entry.endDate)) continue;
+      const start = new Date(entry.startDate);
+      const end = new Date(entry.endDate);
+      if (now < start || now > end) continue;
       const espnWeek = Number(entry.value);
       if (seasonType === 2) return {year, week: espnWeek, seasonType, espnWeek};
       if (espnWeek === 4) return {year, week: 22, seasonType: 3, espnWeek: 5};
@@ -72,6 +95,12 @@ export function resolveCurrentWeek(data: {
   return {year, week: 1, seasonType: 2, espnWeek: 1};
 }
 
+/**
+ * Record which events a schedule sync wrote, for change detection.
+ * @param {admin.firestore.Firestore} db Firestore instance.
+ * @param {ScheduleSelection} selection Season/week selection.
+ * @param {string[]} eventIds Event IDs written for the week.
+ */
 export async function setScheduleSync(
   db: admin.firestore.Firestore,
   selection: ScheduleSelection,
@@ -94,6 +123,11 @@ export async function setScheduleSync(
   });
 }
 
+/**
+ * Verify an ESPN response actually describes the requested schedule.
+ * @param {ScoreboardIdentity} data Scoreboard payload.
+ * @param {ScheduleSelection} selection Expected season/week selection.
+ */
 export function assertMatchingSchedule(
   data: ScoreboardIdentity,
   selection: ScheduleSelection
@@ -103,8 +137,12 @@ export function assertMatchingSchedule(
     data.season?.year === selection.year &&
     data.season?.type === selection.seasonType &&
     data.week?.number === selection.espnWeek;
-  if (!metadataMatches) throw new Error("ESPN returned the wrong season or week");
-  if (events.length === 0) throw new Error("ESPN schedule is not available yet");
+  if (!metadataMatches) {
+    throw new Error("ESPN returned the wrong season or week");
+  }
+  if (events.length === 0) {
+    throw new Error("ESPN schedule is not available yet");
+  }
   if (
     !events.every(
       (event) =>

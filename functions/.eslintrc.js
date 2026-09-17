@@ -20,6 +20,7 @@ module.exports = {
   ignorePatterns: [
     "/lib/**/*", // Ignore built files.
     "/generated/**/*", // Ignore generated files.
+    ".eslintrc.js", // This file is plain JS; tsconfig.dev.json can't parse it.
   ],
   plugins: [
     "@typescript-eslint",
