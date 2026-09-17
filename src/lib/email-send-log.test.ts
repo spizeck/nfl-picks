@@ -4,6 +4,7 @@ import {
   claimEmailSend,
   emailSendDocId,
   EMAIL_SENDS_COLLECTION,
+  markEmailAccepted,
   markEmailFailed,
   markEmailSent,
   type EmailSendRecord,
@@ -89,4 +90,27 @@ test("a stale sending claim can be reclaimed after the lease expires", async () 
     await claimEmailSend(db, baseRecord, 2_000 + 11 * 60 * 1000),
     "claimed"
   );
+});
+
+test("an accepted-but-unrecorded send reconciles instead of resending", async () => {
+  const memory = new MemoryFirestore();
+  const db = asFirestore(memory);
+
+  assert.equal(await claimEmailSend(db, baseRecord, 2_000), "claimed");
+  // Provider accepted; persisting `sent` failed, so the record is `accepted`.
+  await markEmailAccepted(db, baseRecord.key, "resend-id-9", 2_500);
+
+  // A later run must NOT claim this for a resend.
+  assert.equal(await claimEmailSend(db, baseRecord, 4_000), "reconcile");
+
+  // Reconciliation repairs the record without another provider call.
+  await markEmailSent(db, baseRecord.key, undefined, 4_500);
+  assert.equal(await claimEmailSend(db, baseRecord, 5_000), "already-sent");
+
+  const stored = memory.get(
+    `${EMAIL_SENDS_COLLECTION}/${baseRecord.key}`
+  ) as unknown as EmailSendRecord;
+  assert.equal(stored.status, "sent");
+  assert.equal(stored.providerId, "resend-id-9");
+  assert.equal(stored.sentAtMillis, 4_500);
 });

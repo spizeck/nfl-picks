@@ -147,7 +147,9 @@ function findRank(
 
 /**
  * The user's "boldest" correct pick: a win on the team that the smallest
- * share of pickers chose. Returns null when nothing qualifies.
+ * share of pickers chose. Ties break deterministically on game ID, then
+ * selected team ID, so the result never depends on Firestore read order.
+ * Returns null when nothing qualifies.
  */
 export function findBestPick(
   picks: RecapUserPick[],
@@ -165,7 +167,14 @@ export function findBestPick(
     const forTeam = counts.get(pick.selectedTeam) ?? 0;
     if (forTeam === 0) continue;
     const share = forTeam / total;
-    if (!best || share < best.share) {
+    if (
+      !best ||
+      share < best.share ||
+      (share === best.share && pick.gameId < best.pick.gameId) ||
+      (share === best.share &&
+        pick.gameId === best.pick.gameId &&
+        pick.selectedTeam < best.pick.selectedTeam)
+    ) {
       best = { pick, share, total, forTeam };
     }
   }

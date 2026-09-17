@@ -58,7 +58,7 @@ Two Vercel Cron jobs in `vercel.json` drive email:
 - `/api/cron/pick-reminder` fires Thursday 00:00 UTC and only sends when it is Wednesday 5:00 PM `America/Phoenix`, which the route verifies from the IANA timezone rather than a fixed offset. Users with unpicked games whose kickoffs are still ahead get a reminder listing the missing matchups.
 - `/api/cron/weekly-recap` runs daily, finds the most recent week whose games are all final, and sends one recap per player who picked that week.
 
-Both jobs write `emailSends/{year}-{week}-{userId}-{type}` records claimed in a transaction before sending, so retried or duplicated invocations never deliver the same email twice. Users can toggle each email category under the mail icon in the header (`users/{uid}.emailPreferences`).
+Both jobs write `emailSends/{year}-{week}-{userId}-{type}` records claimed in a transaction before sending, and the same key is passed to Resend as its `Idempotency-Key` header. Provider rejections are retryable; once Resend accepts a message the record is reconciled to `sent` (via `accepted` if the write fails) rather than resent. The honest guarantee is at-least-once with provider-level dedupe: a crash in the narrow gap between provider acceptance and the state write can only be fully deduped while Resend retains the idempotency key. Users can toggle each email category under the mail icon in the header (`users/{uid}.emailPreferences`).
 
 ## Commands
 

@@ -6,8 +6,10 @@ import {
   type StoredGame,
 } from "./email-reminder";
 import {
+  emailPreferenceField,
   isUsableEmail,
   resolveEmailPreferences,
+  withEmailPreference,
 } from "./email-preferences";
 import {
   buildLeaderboardContext,
@@ -104,6 +106,28 @@ test("email preferences default to enabled and honor explicit opt-outs", () => {
       emailPreferences: { weeklyRecap: false },
     }).weeklyRecap,
     false
+  );
+});
+
+test("changing one preference preserves the sibling setting", () => {
+  const prefs = { weeklyRecap: false, pickReminders: true };
+  // Toggling pickReminders must not reset weeklyRecap to its default.
+  assert.deepEqual(withEmailPreference(prefs, "pickReminders", false), {
+    weeklyRecap: false,
+    pickReminders: false,
+  });
+  assert.deepEqual(withEmailPreference(prefs, "weeklyRecap", true), {
+    weeklyRecap: true,
+    pickReminders: true,
+  });
+  // Writes use a dotted field path so only the leaf field is touched.
+  assert.equal(
+    emailPreferenceField("weeklyRecap"),
+    "emailPreferences.weeklyRecap"
+  );
+  assert.equal(
+    emailPreferenceField("pickReminders"),
+    "emailPreferences.pickReminders"
   );
 });
 
@@ -204,6 +228,27 @@ test("best pick ignores losses and single-picker games", () => {
     ),
     null
   );
+});
+
+test("equal-share boldest calls break ties deterministically", () => {
+  const games = [
+    game("g1", "2026-09-10T00:20:00Z", "post"),
+    game("g2", "2026-09-14T00:15:00Z", "post"),
+  ];
+  const pickCounts = new Map([
+    ["g1", new Map([["home-g1", 1], ["away-g1", 3]])],
+    ["g2", new Map([["home-g2", 1], ["away-g2", 3]])],
+  ]);
+  const forward = [
+    { gameId: "g1", selectedTeam: "home-g1", result: "win" as const },
+    { gameId: "g2", selectedTeam: "home-g2", result: "win" as const },
+  ];
+  const reversed = [...forward].reverse();
+
+  // Both picks have share 1/4; the lower game ID wins regardless of the
+  // order the picks come back from the database.
+  assert.equal(findBestPick(forward, games, pickCounts)?.matchup, "Away g1 at Home g1");
+  assert.equal(findBestPick(reversed, games, pickCounts)?.matchup, "Away g1 at Home g1");
 });
 
 test("weekly recap model derives records, ranks, and movement", () => {

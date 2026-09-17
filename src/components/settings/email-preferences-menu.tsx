@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { User as FirebaseUser } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,9 @@ import {
 import { getFirestoreDb } from "@/lib/firebase";
 import {
   EMAIL_PREFERENCE_DEFAULTS,
+  emailPreferenceField,
   resolveEmailPreferences,
+  withEmailPreference,
   type EmailPreferences,
 } from "@/lib/email-preferences";
 
@@ -54,22 +56,32 @@ export function EmailPreferencesMenu({ user }: EmailPreferencesMenuProps) {
     const db = getFirestoreDb();
     if (!db) return;
 
-    setPrefs((current) => ({
-      ...(current ?? EMAIL_PREFERENCE_DEFAULTS),
-      [key]: value,
-    }));
+    setPrefs((current) =>
+      withEmailPreference(current ?? EMAIL_PREFERENCE_DEFAULTS, key, value)
+    );
+    const ref = doc(db, "users", user.uid);
     try {
-      await setDoc(
-        doc(db, "users", user.uid),
-        { emailPreferences: { [key]: value } },
-        { merge: true }
-      );
-    } catch (error) {
-      console.error("Error saving email preferences:", error);
-      setPrefs((current) => ({
-        ...(current ?? EMAIL_PREFERENCE_DEFAULTS),
-        [key]: !value,
-      }));
+      // Dotted-path update writes only the changed leaf field so the sibling
+      // preference is preserved even when it was explicitly set.
+      await updateDoc(ref, emailPreferenceField(key), value);
+    } catch {
+      try {
+        // The user document may not exist yet; create it with just this key.
+        await setDoc(
+          ref,
+          { emailPreferences: { [key]: value } },
+          { merge: true }
+        );
+      } catch (fallbackError) {
+        console.error("Error saving email preferences:", fallbackError);
+        setPrefs((current) =>
+          withEmailPreference(
+            current ?? EMAIL_PREFERENCE_DEFAULTS,
+            key,
+            !value
+          )
+        );
+      }
     }
   };
 

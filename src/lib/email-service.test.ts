@@ -17,16 +17,18 @@ const APP_URL = "https://picks.example.com";
 
 function makeTransport(failFor?: Set<string>) {
   const sent: OutboundEmail[] = [];
+  const idempotencyKeys: Array<string | undefined> = [];
   const transport: EmailTransport = {
-    async send(email) {
+    async send(email, options) {
       if (failFor?.has(email.to)) {
         throw new Error("provider rejected the message");
       }
       sent.push(email);
+      idempotencyKeys.push(options?.idempotencyKey);
       return { id: `resend-${sent.length}` };
     },
   };
-  return { sent, transport };
+  return { sent, idempotencyKeys, transport };
 }
 
 function addUser(
@@ -105,7 +107,7 @@ function seedReminderScenario() {
 
 test("reminder goes only to users with eligible unpicked games", async () => {
   const db = seedReminderScenario();
-  const { sent, transport } = makeTransport();
+  const { sent, idempotencyKeys, transport } = makeTransport();
 
   const summary = await runPickReminders({
     db: asFirestore(db),
@@ -136,6 +138,15 @@ test("reminder goes only to users with eligible unpicked games", async () => {
   assert.match(carol.html, /Away g2/);
   assert.match(carol.html, /Away g3/);
   assert.equal(carol.html.includes("Away g1"), false);
+
+  // The deterministic send key doubles as the provider idempotency key.
+  assert.deepEqual(
+    [...idempotencyKeys].sort(),
+    [
+      "2026-3-alice-incomplete-picks-reminder",
+      "2026-3-carol-incomplete-picks-reminder",
+    ]
+  );
 });
 
 test("no reminders are sent when every pickable game is picked", async () => {
@@ -215,6 +226,43 @@ test("one failed send does not stop the batch and stays retryable", async () => 
   const second = await runPickReminders({ ...ctx, transport: retryTransport });
   assert.equal(second.sent, 1);
   assert.deepEqual(retried.map((e) => e.to), ["carol@example.com"]);
+
+  const record = db.get("emailSends/2026-3-carol-incomplete-picks-reminder");
+  assert.equal(record?.status, "sent");
+  assert.equal(record?.attempts, 2);
+});
+
+test("provider acceptance followed by persistence failure never resends", async () => {
+  const db = seedReminderScenario();
+  // Fail the first update to Alice's send record — this is the markEmailSent
+  // write that runs after the provider has already accepted the email.
+  db.failNextUpdates(
+    "emailSends/2026-3-alice-incomplete-picks-reminder",
+    1
+  );
+  const { sent, transport } = makeTransport();
+  const ctx = {
+    db: asFirestore(db),
+    transport,
+    selection: SELECTION,
+    now: NOW,
+    appUrl: APP_URL,
+  };
+
+  const first = await runPickReminders(ctx);
+  assert.equal(sent.length, 2);
+  assert.equal(first.failed, 1);
+
+  // The record must NOT be `failed` — a blind retry would duplicate Alice's
+  // email. It is `accepted` so a later run reconciles without resending.
+  const recordPath = "emailSends/2026-3-alice-incomplete-picks-reminder";
+  assert.equal(db.get(recordPath)?.status, "accepted");
+  assert.equal(db.get(recordPath)?.providerId, "resend-1");
+
+  const second = await runPickReminders(ctx);
+  assert.equal(second.sent, 0);
+  assert.equal(sent.length, 2);
+  assert.equal(db.get(recordPath)?.status, "sent");
 });
 
 function seedRecapScenario() {

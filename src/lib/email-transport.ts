@@ -17,7 +17,10 @@ export interface OutboundEmail {
 }
 
 export interface EmailTransport {
-  send(email: OutboundEmail): Promise<{ id?: string }>;
+  send(
+    email: OutboundEmail,
+    options?: { idempotencyKey?: string }
+  ): Promise<{ id?: string }>;
 }
 
 export function getSenderAddress(): string {
@@ -47,14 +50,19 @@ export function createResendTransport(
   const resend = new Resend(apiKey);
   const from = getSenderAddress();
   return {
-    async send(email) {
-      const { data, error } = await resend.emails.send({
-        from,
-        to: email.to,
-        subject: email.subject,
-        html: email.html,
-        text: email.text,
-      });
+    async send(email, options) {
+      const { data, error } = await resend.emails.send(
+        {
+          from,
+          to: email.to,
+          subject: email.subject,
+          html: email.html,
+          text: email.text,
+        },
+        options?.idempotencyKey
+          ? { idempotencyKey: options.idempotencyKey }
+          : undefined
+      );
       if (error) {
         throw new Error(`Resend send failed (${error.name}): ${error.message}`);
       }

@@ -33,6 +33,26 @@ export function resolveEmailPreferences(
 }
 
 /**
+ * Dotted Firestore field path for updating one preference without touching
+ * its sibling, e.g. `emailPreferences.weeklyRecap`.
+ */
+export function emailPreferenceField(key: keyof EmailPreferences): string {
+  return `emailPreferences.${key}`;
+}
+
+/**
+ * Merge a single preference change into a resolved preference set while
+ * preserving the sibling setting.
+ */
+export function withEmailPreference(
+  current: EmailPreferences,
+  key: keyof EmailPreferences,
+  value: boolean
+): EmailPreferences {
+  return { ...current, [key]: value };
+}
+
+/**
  * Conservative "can we send to this address" check. Not a full RFC validator;
  * it only filters out missing or clearly malformed values.
  */

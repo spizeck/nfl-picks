@@ -63,6 +63,7 @@ export class MemoryDocRef {
   }
 
   async update(data: MemoryDocData): Promise<void> {
+    this.store.throwIfUpdateFails(this.path);
     this.store.set(this.path, { ...this.store.get(this.path), ...data });
   }
 }
@@ -117,6 +118,7 @@ export class MemoryCollectionRef {
 
 export class MemoryFirestore {
   private readonly records = new Map<string, MemoryDocData>();
+  private readonly updateFailures = new Map<string, number>();
 
   get(path: string): MemoryDocData | undefined {
     return this.records.get(path);
@@ -124,6 +126,19 @@ export class MemoryFirestore {
 
   set(path: string, data: MemoryDocData): void {
     this.records.set(path, data);
+  }
+
+  /** Make the next `count` update() calls to `path` throw. */
+  failNextUpdates(path: string, count = 1): void {
+    this.updateFailures.set(path, count);
+  }
+
+  throwIfUpdateFails(path: string): void {
+    const remaining = this.updateFailures.get(path) ?? 0;
+    if (remaining > 0) {
+      this.updateFailures.set(path, remaining - 1);
+      throw new Error(`Injected update failure on ${path}`);
+    }
   }
 
   entries(): IterableIterator<[string, MemoryDocData]> {
@@ -141,14 +156,14 @@ export class MemoryFirestore {
       update: (ref: MemoryDocRef, data: MemoryDocData) => void;
     }) => Promise<T>
   ): Promise<T> {
-    const store = this.records;
     return fn({
       get: (ref) => ref.get(),
       set: (ref, data) => {
-        store.set(ref.path, data);
+        this.records.set(ref.path, data);
       },
       update: (ref, data) => {
-        store.set(ref.path, { ...store.get(ref.path), ...data });
+        this.throwIfUpdateFails(ref.path);
+        this.records.set(ref.path, { ...this.records.get(ref.path), ...data });
       },
     });
   }

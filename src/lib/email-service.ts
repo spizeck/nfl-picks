@@ -25,6 +25,7 @@ import {
 import {
   claimEmailSend,
   emailSendDocId,
+  markEmailAccepted,
   markEmailFailed,
   markEmailSent,
 } from "./email-send-log";
@@ -104,17 +105,43 @@ async function sendClaimedEmail(opts: {
   summary: EmailBatchSummary;
 }): Promise<void> {
   const claim = await claimEmailSend(opts.db, opts.claim);
+  if (claim === "reconcile") {
+    // The provider already accepted this email; only repair the record.
+    await markEmailSent(opts.db, opts.key);
+    opts.summary.skipped++;
+    return;
+  }
   if (claim !== "claimed") {
     opts.summary.skipped++;
     return;
   }
+
+  const email = opts.render();
+  let result: { id?: string };
   try {
-    const email = opts.render();
-    const result = await opts.transport.send(email);
+    result = await opts.transport.send(email, { idempotencyKey: opts.key });
+  } catch (error) {
+    // The provider rejected or errored before acceptance; safe to retry.
+    await markEmailFailed(opts.db, opts.key, error);
+    throw error;
+  }
+
+  try {
     await markEmailSent(opts.db, opts.key, result.id);
     opts.summary.sent++;
   } catch (error) {
-    await markEmailFailed(opts.db, opts.key, error);
+    // Provider accepted the email but the `sent` write failed. Record
+    // `accepted` so a retry reconciles instead of duplicating delivery; if
+    // even that write fails the record stays `sending` and any lease-expired
+    // replay carries the same Resend idempotency key.
+    try {
+      await markEmailAccepted(opts.db, opts.key, result.id);
+    } catch (acceptError) {
+      console.error(
+        `Could not persist send state for ${opts.key}; provider accepted the message. Reconcile manually.`,
+        acceptError
+      );
+    }
     throw error;
   }
 }
