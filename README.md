@@ -75,7 +75,7 @@ npm run build
 
 ## Continuous integration
 
-GitHub Actions (`.github/workflows/ci.yml`) validates every pull request and push to `master` under Node 24. The `App (Next.js)` job runs `npm ci`, `npm test`, `npx tsc --noEmit`, `npm run lint`, and `npm run build`; the `Functions (Firebase)` job runs `npm ci`, `npm run lint`, and `npm run build` in `functions/`. CI requires no production secrets and never deploys.
+GitHub Actions (`.github/workflows/ci.yml`) validates every pull request and push to `master` under Node 24. The `App (Next.js)` job runs `npm ci`, `npm test`, `npx tsc --noEmit`, `npm run lint`, and `npm run build`; the `Functions (Firebase)` job runs `npm ci`, `npm run lint`, and `npm run build` in `functions/`. CI requires no production secrets and never deploys. Both checks are required to pass before a pull request can merge to `master`.
 
 ## Firebase and Google sign-in
 
