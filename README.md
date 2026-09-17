@@ -19,7 +19,7 @@ NFL Picks is a Next.js 16 application for choosing NFL game winners, comparing r
 
 ## Local setup
 
-Requirements: Node.js 20+ for the web app, npm, and a Firebase project. Cloud Functions declare Node.js 24.
+Requirements: Node.js 24 for the web app and Cloud Functions (see `.nvmrc` and each package's `engines.node`), npm, and a Firebase project.
 
 ```bash
 npm install
@@ -72,6 +72,10 @@ cd functions
 npm install
 npm run build
 ```
+
+## Continuous integration
+
+GitHub Actions (`.github/workflows/ci.yml`) validates every pull request and push to `master` under Node 24. The `App (Next.js)` job runs `npm ci`, `npm test`, `npx tsc --noEmit`, `npm run lint`, and `npm run build`; the `Functions (Firebase)` job runs `npm ci`, `npm run lint`, and `npm run build` in `functions/`. CI requires no production secrets and never deploys.
 
 ## Firebase and Google sign-in
 
