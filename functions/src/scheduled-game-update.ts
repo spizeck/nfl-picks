@@ -1,5 +1,6 @@
 import {onSchedule} from "firebase-functions/v2/scheduler";
-import * as admin from "firebase-admin";
+import {getApps, initializeApp} from "firebase-admin/app";
+import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {normalizeESPNGame} from "./lib/espn-data";
 import {
   assertMatchingSchedule,
@@ -10,8 +11,8 @@ import {
 } from "./lib/nfl-season";
 
 // Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
+if (!getApps().length) {
+  initializeApp();
 }
 
 /**
@@ -28,7 +29,7 @@ export const updateGameScores = onSchedule(
   async (_event) => {
     console.log("Starting scheduled game score update");
 
-    const db = admin.firestore();
+    const db = getFirestore();
 
     try {
       // First, get current week info from ESPN API
@@ -161,7 +162,7 @@ export const updateGameScores = onSchedule(
               },
               week: currentWeek,
               year: currentYear,
-              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              lastUpdated: FieldValue.serverTimestamp(),
             }, {merge: true});
 
             if (
@@ -191,7 +192,7 @@ export const updateGameScores = onSchedule(
 
       // Update the last update timestamp
       await lastUpdateRef.set({
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         week: currentWeek,
         year: currentYear,
       });
@@ -221,7 +222,7 @@ export const updateScoresNow = onSchedule(
     console.log("Running manual score update trigger");
 
     // Call the same logic as the main function but bypass the throttle check
-    const db = admin.firestore();
+    const db = getFirestore();
 
     try {
       // Clear the last update check to force an update
@@ -251,7 +252,7 @@ export const forceUpdateWeek17 = onSchedule(
   async (_event) => {
     console.log("Force updating week 17 games");
 
-    const db = admin.firestore();
+    const db = getFirestore();
 
     try {
       // Clear the last update check to force an update
@@ -276,7 +277,7 @@ export const forceUpdateWeek17 = onSchedule(
  * @param {number} year Season year.
  */
 async function updateWeekGames(week: number, year: number) {
-  const db = admin.firestore();
+  const db = getFirestore();
 
   // Fetch game data from ESPN API
   const selection = getScheduleRequest(year, week);
@@ -332,7 +333,7 @@ async function updateWeekGames(week: number, year: number) {
         },
         week: week,
         year: year,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: FieldValue.serverTimestamp(),
       }, {merge: true});
 
       updatedCount++;
@@ -349,7 +350,7 @@ async function updateWeekGames(week: number, year: number) {
 
   // Update the last update timestamp
   await db.collection("config").doc("lastGameUpdate").set({
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    timestamp: FieldValue.serverTimestamp(),
     week: week,
     year: year,
   });

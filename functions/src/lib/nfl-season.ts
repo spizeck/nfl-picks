@@ -1,4 +1,4 @@
-import * as admin from "firebase-admin";
+import {Firestore, Timestamp} from "firebase-admin/firestore";
 
 const ESPN_API_URL =
   "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
@@ -97,22 +97,22 @@ export function resolveCurrentWeek(data: {
 
 /**
  * Record which events a schedule sync wrote, for change detection.
- * @param {admin.firestore.Firestore} db Firestore instance.
+ * @param {Firestore} db Firestore instance.
  * @param {ScheduleSelection} selection Season/week selection.
  * @param {string[]} eventIds Event IDs written for the week.
  */
 export async function setScheduleSync(
-  db: admin.firestore.Firestore,
+  db: Firestore,
   selection: ScheduleSelection,
   eventIds: string[]
 ): Promise<void> {
   if (eventIds.length === 0) return;
-  const now = admin.firestore.Timestamp.now();
+  const now = Timestamp.now();
   await db.collection("cache").doc(
     `schedule-sync-${selection.year}-${selection.week}`
   ).set({
     timestamp: now,
-    expiresAt: admin.firestore.Timestamp.fromMillis(
+    expiresAt: Timestamp.fromMillis(
       now.toMillis() + 7 * 24 * 60 * 60 * 1000
     ),
     eventIds: [...eventIds].sort(),

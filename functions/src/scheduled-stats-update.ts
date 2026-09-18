@@ -1,8 +1,13 @@
 import {onDocumentUpdated} from "firebase-functions/v2/firestore";
-import * as admin from "firebase-admin";
+import {getApps, initializeApp} from "firebase-admin/app";
+import {
+  FieldValue,
+  Firestore,
+  getFirestore,
+} from "firebase-admin/firestore";
 
-if (!admin.apps.length) {
-  admin.initializeApp();
+if (!getApps().length) {
+  initializeApp();
 }
 
 interface GameData {
@@ -39,7 +44,7 @@ export const onGameComplete = onDocumentUpdated(
 
     console.log(`Game ${gameId} just completed, updating affected users`);
 
-    const db = admin.firestore();
+    const db = getFirestore();
     const gameWeek = afterData.week;
     const gameYear = afterData.year;
 
@@ -94,7 +99,7 @@ export const onGameComplete = onDocumentUpdated(
         batch.update(pickRef, {
           result: didWin ? "win" : "loss",
           locked: true,
-          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          processedAt: FieldValue.serverTimestamp(),
         });
 
         usersToUpdate.add(userId);
@@ -121,13 +126,13 @@ export const onGameComplete = onDocumentUpdated(
 
 /**
  * Recompute a user's win/loss/pending stats for a single week.
- * @param {admin.firestore.Firestore} db Firestore instance.
+ * @param {Firestore} db Firestore instance.
  * @param {string} userId User document ID.
  * @param {number} year Season year.
  * @param {number} week Week number.
  */
 async function updateWeekStats(
-  db: admin.firestore.Firestore,
+  db: Firestore,
   userId: string,
   year: number,
   week: number
@@ -167,7 +172,7 @@ async function updateWeekStats(
       losses,
       pending,
       total: wins + losses + pending,
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdated: FieldValue.serverTimestamp(),
     },
     {merge: true}
   );
@@ -179,12 +184,12 @@ async function updateWeekStats(
 
 /**
  * Recompute a user's season totals from their weekly stats.
- * @param {admin.firestore.Firestore} db Firestore instance.
+ * @param {Firestore} db Firestore instance.
  * @param {string} userId User document ID.
  * @param {number} year Season year.
  */
 async function updateSeasonStats(
-  db: admin.firestore.Firestore,
+  db: Firestore,
   userId: string,
   year: number
 ) {
@@ -225,7 +230,7 @@ async function updateSeasonStats(
       totalLosses,
       totalGames,
       weeklyRecords,
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdated: FieldValue.serverTimestamp(),
     },
     {merge: true}
   );
