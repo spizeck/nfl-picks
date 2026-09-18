@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/nfl-season.test.ts src/lib/pick-flow.integration.test.ts src/lib/pwa-assets.test.ts src/lib/leaderboard-ranking.test.ts src/lib/email-time.test.ts src/lib/email-domain.test.ts src/lib/email-send-log.test.ts src/lib/email-templates.test.ts src/lib/email-service.test.ts scripts/data-corrections/2026-week-1-missed-picks.test.ts",
+    "test": "tsx --test src/lib/firebase-admin.test.ts src/lib/nfl-season.test.ts src/lib/pick-flow.integration.test.ts src/lib/pwa-assets.test.ts src/lib/leaderboard-ranking.test.ts src/lib/email-time.test.ts src/lib/email-domain.test.ts src/lib/email-send-log.test.ts src/lib/email-templates.test.ts src/lib/email-service.test.ts scripts/data-corrections/2026-week-1-missed-picks.test.ts",
     "correct:2026-week1-missed-picks": "tsx --env-file=.env.local scripts/data-corrections/2026-week-1-missed-picks.ts",
     "correct:2026-week1-missed-picks:apply": "tsx --env-file=.env.local scripts/data-corrections/2026-week-1-missed-picks.ts --apply"
   },
@@ -23,7 +23,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "firebase": "^12.7.0",
-    "firebase-admin": "^13.10.0",
+    "firebase-admin": "^14.4.0",
     "firebase-functions": "^7.0.2",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",

@@ -1,10 +1,12 @@
 import {onCall} from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
+import {getApps, initializeApp} from "firebase-admin/app";
+import {FieldValue, getFirestore} from "firebase-admin/firestore";
 
 // Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
+if (!getApps().length) {
+  initializeApp();
 }
+
 
 interface UserStats {
   wins: number;
@@ -21,7 +23,7 @@ export const processCompletedGames = onCall(async (request) => {
 
   console.log(`Processing completed games for week ${week}, year ${year}`);
 
-  const db = admin.firestore();
+  const db = getFirestore();
 
   try {
     // Get all games for the specified week
@@ -97,7 +99,7 @@ export const processCompletedGames = onCall(async (request) => {
         await pickRef.update({
           result: result,
           locked: true,
-          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          processedAt: FieldValue.serverTimestamp(),
         });
 
         // Update stats
@@ -133,7 +135,7 @@ export const processCompletedGames = onCall(async (request) => {
         losses: stats.losses,
         pending: pending,
         total: stats.wins + stats.losses + pending,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: FieldValue.serverTimestamp(),
       }, {merge: true});
 
       console.log(

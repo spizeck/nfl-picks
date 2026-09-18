@@ -1,5 +1,6 @@
 import {onCall} from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
+import {getApps, initializeApp} from "firebase-admin/app";
+import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {normalizeESPNGame} from "./lib/espn-data";
 import {
   assertMatchingSchedule,
@@ -9,8 +10,8 @@ import {
 } from "./lib/nfl-season";
 
 // Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
+if (!getApps().length) {
+  initializeApp();
 }
 
 /**
@@ -27,7 +28,7 @@ export const forceUpdateWeek = onCall(async (request) => {
 
   console.log(`Force updating week ${week} games for year ${year}`);
 
-  const db = admin.firestore();
+  const db = getFirestore();
 
   try {
     // Convert internal week numbers (19-22) to ESPN postseason weeks
@@ -98,7 +99,7 @@ export const forceUpdateWeek = onCall(async (request) => {
           },
           week: week,
           year: year,
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+          lastUpdated: FieldValue.serverTimestamp(),
         }, {merge: true});
 
         updatedCount++;
@@ -115,7 +116,7 @@ export const forceUpdateWeek = onCall(async (request) => {
 
     // Update the last update timestamp
     await db.collection("config").doc("lastGameUpdate").set({
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
       week: week,
       year: year,
     });
