@@ -53,6 +53,37 @@ export function withEmailPreference(
 }
 
 /**
+ * Minimal write surface for persisting one preference. Callers adapt their
+ * Firestore SDK (client or admin) to these two operations.
+ */
+export interface EmailPreferenceStore {
+  /** Dotted-path field update, e.g. client `updateDoc(ref, field, value)`. */
+  update(field: string, value: boolean): Promise<unknown>;
+  /** Merge-write used when the user document does not exist yet. */
+  setMerge(data: {
+    emailPreferences: Partial<EmailPreferences>;
+  }): Promise<unknown>;
+}
+
+/**
+ * Persist a single preference change without touching its sibling. Tries a
+ * dotted-path update first so an explicitly stored sibling is preserved;
+ * falls back to a merge write when the user document does not exist yet.
+ * Rejects when both writes fail so callers never report a false save.
+ */
+export async function saveEmailPreference(
+  store: EmailPreferenceStore,
+  key: keyof EmailPreferences,
+  value: boolean
+): Promise<void> {
+  try {
+    await store.update(emailPreferenceField(key), value);
+  } catch {
+    await store.setMerge({ emailPreferences: { [key]: value } });
+  }
+}
+
+/**
  * Conservative "can we send to this address" check. Not a full RFC validator;
  * it only filters out missing or clearly malformed values.
  */

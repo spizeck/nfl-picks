@@ -8,7 +8,7 @@ import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { getFirebaseAuth } from "@/lib/firebase"
 import { PwaControls } from "@/components/pwa/pwa-controls"
-import { EmailPreferencesMenu } from "@/components/settings/email-preferences-menu"
+import { SettingsMenu } from "@/components/settings/settings-menu"
 
 interface AppShellProps {
   children: ReactNode
@@ -78,7 +78,7 @@ function AppHeader({ user }: AppHeaderProps) {
             {user.displayName || user.email}
           </span>
         )}
-        {user && <EmailPreferencesMenu user={user} />}
+        {user && <SettingsMenu user={user} />}
         <Button
           variant="ghost"
           size="icon"

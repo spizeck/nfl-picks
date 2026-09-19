@@ -237,9 +237,9 @@ export function renderRecapEmail(model: WeeklyRecapModel): RenderedEmail {
             <tr>
               <td style="padding:14px 16px;">
                 <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#b45309;">Boldest call 🎯</div>
-                <div style="font-size:15px;font-weight:700;color:${COLORS.text};margin-top:4px;">${escapeHtml(
+                <div style="font-size:15px;font-weight:700;color:${COLORS.text};margin-top:4px;">Your boldest call was to pick the ${escapeHtml(
                   model.bestPick.pickedTeamName
-                )} over ${escapeHtml(model.bestPick.matchup)}</div>
+                )} to win.</div>
                 <div style="font-size:12px;color:${COLORS.muted};margin-top:2px;">Only ${
                   model.bestPick.pickersForTeam
                 } of ${model.bestPick.totalPickers} pickers took them.</div>
@@ -325,7 +325,7 @@ export function renderRecapEmail(model: WeeklyRecapModel): RenderedEmail {
     model.overallRank
   } of ${model.totalPlayers}\nLeaderboard movement: ${movement}${
     model.bestPick
-      ? `\n\nBoldest call: ${model.bestPick.pickedTeamName} — only ${model.bestPick.pickersForTeam} of ${model.bestPick.totalPickers} pickers took them.`
+      ? `\n\nBoldest call 🎯\nYour boldest call was to pick the ${model.bestPick.pickedTeamName} to win.\nOnly ${model.bestPick.pickersForTeam} of ${model.bestPick.totalPickers} pickers took them.`
       : ""
   }\n\nOpen NFL Picks: ${model.appUrl}/`;
 

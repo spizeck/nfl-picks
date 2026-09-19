@@ -1,14 +1,18 @@
 # Changelog
 
-## Unreleased
+## 1.2.0
 
 ### Added
 
 - Weekly recap email sent through the existing `mail.seasaba.com` Resend domain once a week's games are final, covering weekly/season records, weekly rank, leaderboard movement, the season top 3, a deterministic "boldest call" highlight, and a performance-based headline.
 - Incomplete-picks reminder email sent Wednesdays at 5:00 PM `America/Phoenix` to users who still have pickable games unpicked, with the missing matchups and a link back to the picks screen.
-- Independent email preferences (weekly recap, pick reminders) on the user profile, editable from the header mail menu; both default to enabled.
+- Independent email preferences (weekly recap, pick reminders) on the user profile, editable from the header settings menu with loading, saved, and error feedback; both default to enabled.
 - Transaction-claimed `emailSends` records keyed by season, week, user, and email type so retried or duplicated cron invocations never send the same email twice.
 - Vercel Cron schedules for `/api/cron/pick-reminder` and `/api/cron/weekly-recap`, authenticated by `CRON_SECRET`.
+
+### Fixed
+
+- Weekly recap "boldest call" reads naturally (`Your boldest call was to pick the <team> to win.`) instead of duplicating the team name against the full matchup, in both the HTML and plain-text versions.
 
 ## 1.1.0
 
