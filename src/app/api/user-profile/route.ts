@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
+import { getAdminAuth } from "@/lib/firebase-admin-auth";
+import { getAdminDb } from "@/lib/firebase-admin-db";
 import { Timestamp } from "firebase-admin/firestore";
 
 export async function POST(request: NextRequest) {
@@ -8,7 +9,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const adminAuth = getAdminAuth();
+  const adminAuth = await getAdminAuth();
   const adminDb = getAdminDb();
   if (!adminAuth || !adminDb) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });

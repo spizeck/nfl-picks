@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { getAdminDb } from "@/lib/firebase-admin-db";
 import { getCachedSchedule } from "@/lib/espn-cache";
 import {
   ScheduleUnavailableError,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { getAdminDb } from "@/lib/firebase-admin-db";
 import { resolveCurrentWeekSelection } from "@/lib/current-week";
 import { runWeeklyRecaps } from "@/lib/email-service";
 import { createResendTransport, getAppUrl } from "@/lib/email-transport";

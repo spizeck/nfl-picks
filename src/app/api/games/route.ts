@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { getAdminDb } from "@/lib/firebase-admin-db";
 import { formatGameTime, normalizeESPNGame } from "@/lib/espn-data";
 import {
   getFreshScheduleSync,

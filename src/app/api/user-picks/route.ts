@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb, getAdminAuth } from "@/lib/firebase-admin";
+import { getAdminDb } from "@/lib/firebase-admin-db";
+import { getAdminAuth } from "@/lib/firebase-admin-auth";
 import {
   PickValidationError,
   saveValidatedPick,
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
     const token = authHeader.split("Bearer ")[1];
     
     // Verify the Firebase ID token
-    const adminAuth = getAdminAuth();
+    const adminAuth = await getAdminAuth();
     if (!adminAuth) {
       return NextResponse.json(
         { error: "Server configuration error" },
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.split("Bearer ")[1];
-    const adminAuth = getAdminAuth();
+    const adminAuth = await getAdminAuth();
     if (!adminAuth) {
       return NextResponse.json(
         { error: "Server configuration error" },
