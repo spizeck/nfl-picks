@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { getAdminDb } from "@/lib/firebase-admin-db";
 import type { PickWithUserInfo } from "@/lib/types";
 
 export async function GET(request: Request) {

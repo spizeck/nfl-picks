@@ -1,4 +1,4 @@
-import { getAdminDb } from "./firebase-admin";
+import { getAdminDb } from "./firebase-admin-db";
 import { Timestamp } from "firebase-admin/firestore";
 import type { ESPNEvent } from "./espn-data";
 import {
