@@ -63,3 +63,35 @@ test("Firestore-only sources never import the admin Auth graph", () => {
     );
   }
 });
+
+test("jwks-rsa resolves a require()-able jose build", () => {
+  // jwks-rsa is CommonJS and calls require("jose"); jose@6 ships no CJS
+  // build, which caused ERR_REQUIRE_ESM in the Vercel runtime. The package
+  // override pins jwks-rsa's jose to 5.x — this guards that resolution.
+  const jwksRsaDir = require("path").dirname(
+    require.resolve("jwks-rsa/package.json")
+  );
+  const joseEntry = require.resolve("jose", { paths: [jwksRsaDir] });
+  const josePkg = require(require.resolve("jose/package.json", {
+    paths: [jwksRsaDir],
+  })) as { version: string };
+
+  assert.ok(
+    Number(josePkg.version.split(".")[0]) < 6,
+    `jose@${josePkg.version} must be < 6 (6.x is ESM-only); ` +
+      `resolved entry: ${joseEntry}`
+  );
+  assert.doesNotThrow(
+    () => require(joseEntry),
+    `jwks-rsa's jose must be require()-able; resolved: ${joseEntry}`
+  );
+});
+
+test("firebase-admin/auth loads without ERR_REQUIRE_ESM", () => {
+  // The exact production failure: evaluating the auth graph (jwks-rsa ->
+  // jose) threw ERR_REQUIRE_ESM inside the Vercel server bundle. Requiring
+  // the real package exercises the same module resolution.
+  assert.doesNotThrow(() => {
+    require("firebase-admin/auth");
+  });
+});

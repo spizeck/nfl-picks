@@ -14,6 +14,11 @@
     "correct:2026-week1-missed-picks": "tsx --env-file=.env.local scripts/data-corrections/2026-week-1-missed-picks.ts",
     "correct:2026-week1-missed-picks:apply": "tsx --env-file=.env.local scripts/data-corrections/2026-week-1-missed-picks.ts --apply"
   },
+  "overrides": {
+    "jwks-rsa": {
+      "jose": "5.10.0"
+    }
+  },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-collapsible": "^1.1.12",
