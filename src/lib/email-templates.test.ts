@@ -104,6 +104,52 @@ test("recap email renders records, ranks, movement, top 3, and best pick", () =>
   assert.match(rendered.text, /This week: 2-0/);
 });
 
+test("recap boldest call names the picked team naturally in html and text", () => {
+  const rendered = renderRecapEmail(recapModel);
+
+  const sentence =
+    "Your boldest call was to pick the Pittsburgh Steelers to win.";
+  assert.ok(rendered.html.includes(sentence));
+  assert.ok(rendered.text.includes(sentence));
+  // Picker-share copy is preserved alongside the natural sentence.
+  const share = "Only 1 of 4 pickers took them.";
+  assert.ok(rendered.html.includes(share));
+  assert.ok(rendered.text.includes(share));
+});
+
+test("recap boldest call never renders 'Team over Team at Opponent'", () => {
+  const rendered = renderRecapEmail({
+    ...recapModel,
+    bestPick: {
+      matchup: "Arizona Cardinals at Los Angeles Chargers",
+      pickedTeamName: "Arizona Cardinals",
+      pickersForTeam: 3,
+      totalPickers: 10,
+    },
+  });
+
+  assert.doesNotMatch(rendered.html, / over /);
+  assert.doesNotMatch(rendered.text, / over /);
+  assert.equal(
+    rendered.html.includes(
+      "Arizona Cardinals over Arizona Cardinals at Los Angeles Chargers"
+    ),
+    false
+  );
+  assert.ok(
+    rendered.html.includes(
+      "Your boldest call was to pick the Arizona Cardinals to win."
+    )
+  );
+  assert.ok(rendered.html.includes("Only 3 of 10 pickers took them."));
+  assert.ok(
+    rendered.text.includes(
+      "Your boldest call was to pick the Arizona Cardinals to win."
+    )
+  );
+  assert.ok(rendered.text.includes("Only 3 of 10 pickers took them."));
+});
+
 test("recap email omits optional blocks when data is unavailable", () => {
   const rendered = renderRecapEmail({
     ...recapModel,

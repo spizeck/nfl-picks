@@ -1,6 +1,6 @@
 {
   "name": "nfl-picks",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "engines": {
     "node": "24"
@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/firebase-admin.test.ts src/lib/nfl-season.test.ts src/lib/pick-flow.integration.test.ts src/lib/pwa-assets.test.ts src/lib/leaderboard-ranking.test.ts src/lib/email-time.test.ts src/lib/email-domain.test.ts src/lib/email-send-log.test.ts src/lib/email-templates.test.ts src/lib/email-service.test.ts scripts/data-corrections/2026-week-1-missed-picks.test.ts",
+    "test": "tsx --test src/lib/firebase-admin.test.ts src/lib/nfl-season.test.ts src/lib/pick-flow.integration.test.ts src/lib/pwa-assets.test.ts src/lib/leaderboard-ranking.test.ts src/lib/email-time.test.ts src/lib/email-domain.test.ts src/lib/email-preferences.test.ts src/lib/email-send-log.test.ts src/lib/email-templates.test.ts src/lib/email-service.test.ts scripts/data-corrections/2026-week-1-missed-picks.test.ts",
     "correct:2026-week1-missed-picks": "tsx --env-file=.env.local scripts/data-corrections/2026-week-1-missed-picks.ts",
     "correct:2026-week1-missed-picks:apply": "tsx --env-file=.env.local scripts/data-corrections/2026-week-1-missed-picks.ts --apply"
   },
