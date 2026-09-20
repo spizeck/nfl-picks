@@ -1,0 +1,150 @@
+version: 2
+
+# Dependabot policy for this repo:
+# - Weekly, predictable cadence; bounded concurrent PR volume.
+# - Routine compatible updates are grouped to reduce noise, but there is no
+#   catch-all group: every group is scoped by dependency-type + update-type.
+# - Groups apply to version-updates only, so security updates are never
+#   grouped, delayed, or suppressed.
+# - Operationally sensitive packages are excluded from routine groups (or
+#   given dedicated family groups) so every upgrade arrives as its own
+#   reviewable PR. In particular, firebase-admin updates can never be buried
+#   inside a general maintenance group — a lesson from the Admin v14 /
+#   jwks-rsa / ESM-only jose production outage. Note: the scoped npm
+#   `overrides` entry pinning jose@5.10.0 inside jwks-rsa's subtree lives in
+#   package.json and is unaffected by this configuration; Dependabot version
+#   updates preserve it, and any firebase-admin bump that changes the
+#   jwks-rsa/jose graph must be verified against the Vercel runtime before
+#   merge.
+# - No auto-merge: Dependabot PRs go through the same required CI checks and
+#   human review as any other PR.
+
+updates:
+  # Root Next.js application (package-lock.json)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Lockstep framework families: exact-pinned pairs/families that must
+      # move together get dedicated PRs. All update types are included, so a
+      # Next.js or React major is still a conspicuous, dedicated PR — just
+      # never mixed with unrelated maintenance.
+      nextjs:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # Radix primitives are one component family — routine updates group
+      # well, but majors still get individual PRs.
+      radix:
+        patterns:
+          - "@radix-ui/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Type packages not already claimed by the react group. A @types/node
+      # major (tied to the Node runtime standardization) stays individual.
+      types:
+        patterns:
+          - "@types/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Routine development tooling (tsx, tailwindcss, postcss plugin,
+      # babel-plugin-react-compiler, ...). TypeScript and ESLint are excluded
+      # — compiler/linter upgrades are always individually reviewable.
+      dev-tooling:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+        exclude-patterns:
+          - "typescript"
+          - "eslint"
+          - "@types/*"
+      # Remaining production dependencies: routine compatible updates only.
+      # Everything listed below is excluded so it is always an individual PR:
+      #   - next/eslint-config-next, react family, radix (dedicated groups)
+      #   - firebase client SDK, firebase-admin, firebase-functions (post-
+      #     outage policy: every Firebase update is conspicuous)
+      #   - framer-motion, lucide-react (previously deferred majors)
+      # Major updates for grouped packages also fall outside this group and
+      # get their own PRs.
+      minor-patch:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+        exclude-patterns:
+          - "next"
+          - "eslint-config-next"
+          - "react"
+          - "react-dom"
+          - "@radix-ui/*"
+          - "firebase*"
+          - "framer-motion"
+          - "lucide-react"
+
+  # Firebase Functions project (functions/package-lock.json) — a separate
+  # dependency tree with its own runtime concerns; never merged with root.
+  - package-ecosystem: "npm"
+    directory: "/functions"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # The typescript-eslint plugin and parser must version in lockstep, so
+      # they share a dedicated PR for every update type.
+      typescript-eslint:
+        patterns:
+          - "@typescript-eslint/*"
+      # Routine dev tooling: cross-env, eslint-config-google,
+      # eslint-plugin-import. ESLint and TypeScript are excluded and always
+      # get individual PRs. firebase-admin and firebase-functions (production
+      # deps) are intentionally in no group — every update is conspicuous.
+      dev-tooling:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+        exclude-patterns:
+          - "typescript"
+          - "eslint"
+          - "@typescript-eslint/*"
+
+  # GitHub Actions workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      # Routine compatible action updates (checkout, setup-node, ...) group
+      # together; major action-version changes fall outside the group and
+      # get individual PRs for meaningful review.
+      actions:
+        update-types:
+          - "minor"
+          - "patch"
