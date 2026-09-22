@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeESPNGame, type ESPNEvent } from "./espn-data";
+import {
+  gameNeedsUpdate,
+  normalizeESPNGame,
+  type ESPNEvent,
+  type StoredGameSnapshot,
+} from "./espn-data";
 
 interface CompetitorSpec {
   homeAway: "home" | "away";
@@ -138,4 +143,97 @@ test("missing, malformed, and inconsistent records are preserved or omitted", ()
   );
   assert.equal(inconsistent.away.record, "0-1");
   assert.equal(inconsistent.home.record, "1-0");
+});
+
+test("an omitted ESPN record never counts as update drift", () => {
+  // Writers only merge defined records, so a stored record must not be flagged
+  // as changed when ESPN omits the field -- otherwise the scheduled updater
+  // would rewrite the document every run without ever clearing the value.
+  const stored: StoredGameSnapshot = {
+    away: { score: 0, record: "1-1" },
+    home: { score: 0, record: "0-2" },
+    status: { state: "pre" },
+  };
+  const withoutRecords = normalizeESPNGame(
+    espnEvent("pre", [
+      { homeAway: "away", score: 0 },
+      { homeAway: "home", score: 0 },
+    ])
+  );
+  assert.equal(withoutRecords.away.record, undefined);
+  assert.equal(gameNeedsUpdate(stored, withoutRecords), false);
+
+  const homeOnly = normalizeESPNGame(
+    espnEvent("pre", [
+      { homeAway: "away", record: "1-1", score: 0 },
+      { homeAway: "home", score: 0 },
+    ])
+  );
+  assert.equal(gameNeedsUpdate(stored, homeOnly), false);
+});
+
+test("a changed record triggers an update", () => {
+  const stored: StoredGameSnapshot = {
+    away: { score: 0, record: "1-1" },
+    home: { score: 0, record: "1-1" },
+    status: { state: "pre" },
+  };
+  const rolledForward = normalizeESPNGame(
+    espnEvent("pre", [
+      { homeAway: "away", record: "2-1", score: 0 },
+      { homeAway: "home", record: "1-1", score: 0 },
+    ])
+  );
+  assert.equal(gameNeedsUpdate(stored, rolledForward), true);
+
+  const homeChanged = normalizeESPNGame(
+    espnEvent("pre", [
+      { homeAway: "away", record: "1-1", score: 0 },
+      { homeAway: "home", record: "1-2", score: 0 },
+    ])
+  );
+  assert.equal(gameNeedsUpdate(stored, homeChanged), true);
+});
+
+test("update detection covers new docs, backfills, and score/status drift", () => {
+  const unchanged = normalizeESPNGame(
+    espnEvent("pre", [
+      { homeAway: "away", record: "1-1", score: 0 },
+      { homeAway: "home", record: "0-2", score: 0 },
+    ])
+  );
+  assert.equal(gameNeedsUpdate(null, unchanged), true);
+  assert.equal(
+    gameNeedsUpdate(
+      {
+        away: { score: 0 },
+        home: { score: 0, record: "0-2" },
+        status: { state: "pre" },
+      },
+      unchanged
+    ),
+    true
+  );
+  assert.equal(
+    gameNeedsUpdate(
+      {
+        away: { score: 0, record: "1-1" },
+        home: { score: 0, record: "0-2" },
+        status: { state: "pre" },
+      },
+      unchanged
+    ),
+    false
+  );
+  assert.equal(
+    gameNeedsUpdate(
+      {
+        away: { score: 0, record: "1-1" },
+        home: { score: 0, record: "0-2" },
+        status: { state: "in" },
+      },
+      unchanged
+    ),
+    true
+  );
 });

@@ -1,7 +1,7 @@
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {getApps, initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
-import {normalizeESPNGame} from "./lib/espn-data";
+import {gameNeedsUpdate, normalizeESPNGame} from "./lib/espn-data";
 import {
   assertMatchingSchedule,
   buildScoreboardUrl,
@@ -118,29 +118,10 @@ export const updateGameScores = onSchedule(
           const gameDoc = await gameRef.get();
           const currentData = gameDoc.exists ? gameDoc.data() : null;
 
-          // Check if we need to update this game
-          let needsUpdate = false;
-
-          if (!currentData) {
-            // New game - always update
-            needsUpdate = true;
-          } else {
-            // Check if scores, records, or status changed
-            const awayScoreChanged =
-              currentData.away?.score !== normalizedGame.away.score;
-            const homeScoreChanged =
-              currentData.home?.score !== normalizedGame.home.score;
-            const awayRecordChanged =
-              currentData.away?.record !== normalizedGame.away.record;
-            const homeRecordChanged =
-              currentData.home?.record !== normalizedGame.home.record;
-            const statusChanged =
-              currentData.status?.state !== normalizedGame.status.state;
-
-            needsUpdate =
-              awayScoreChanged || homeScoreChanged || statusChanged ||
-              awayRecordChanged || homeRecordChanged;
-          }
+          // Check if we need to update this game. A record ESPN omitted is
+          // never a change: the merge payload preserves the stored value, so
+          // counting it would rewrite the document on every run.
+          const needsUpdate = gameNeedsUpdate(currentData, normalizedGame);
 
           if (needsUpdate) {
             // Update the game with latest data

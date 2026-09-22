@@ -237,6 +237,39 @@ function subtractGameResult(
   return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
 }
 
+export interface StoredGameSnapshot {
+  away?: {score?: number; record?: string};
+  home?: {score?: number; record?: string};
+  status?: {state?: string};
+}
+
+/**
+ * Determine whether a stored game document differs from freshly normalized
+ * ESPN data in a way that should be persisted.
+ *
+ * A record omitted by ESPN never counts as a change: writers merge only
+ * defined records, so treating an upstream omission as drift would rewrite
+ * the document on every run without ever clearing the stored value.
+ * @param {StoredGameSnapshot|null|undefined} currentData Stored game data.
+ * @param {NormalizedGame} normalizedGame Freshly normalized ESPN data.
+ * @return {boolean} True when the document should be rewritten.
+ */
+export function gameNeedsUpdate(
+  currentData: StoredGameSnapshot | null | undefined,
+  normalizedGame: NormalizedGame
+): boolean {
+  if (!currentData) return true;
+  return (
+    currentData.away?.score !== normalizedGame.away.score ||
+    currentData.home?.score !== normalizedGame.home.score ||
+    currentData.status?.state !== normalizedGame.status.state ||
+    (normalizedGame.away.record !== undefined &&
+      normalizedGame.away.record !== currentData.away?.record) ||
+    (normalizedGame.home.record !== undefined &&
+      normalizedGame.home.record !== currentData.home?.record)
+  );
+}
+
 /**
  * Format game time for pre-game display
  * @param {Date} date Game start time in UTC.
