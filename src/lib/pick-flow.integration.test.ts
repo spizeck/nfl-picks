@@ -130,6 +130,100 @@ test("a fresh schedule can be loaded, picked, and reloaded without pre-seeded ga
   assert.equal(reloaded.data()?.selectedTeam, "home");
 });
 
+test("resyncing a week rolls stored records forward and keeps entering-week records", async () => {
+  const memory = new MemoryFirestore();
+  const db = memory as unknown as FirebaseFirestore.Firestore;
+
+  // Stale doc left over from a Week 3 sync that ran before Week 2 finished.
+  memory.records.set("games/game-3", {
+    eventId: "game-3",
+    date: "2026-09-21T17:00:00Z",
+    week: 3,
+    year: 2026,
+    away: { id: "away", name: "Away", logo: "away.svg", record: "0-1" },
+    home: { id: "home", name: "Home", logo: "home.svg", record: "1-0" },
+    status: { state: "pre", displayText: "Sun 1:00 PM" },
+  });
+
+  const week3Pre: ESPNScoreboard = {
+    season: { year: 2026, type: 2 },
+    week: { number: 3 },
+    events: [
+      {
+        id: "game-3",
+        date: "2026-09-21T17:00:00Z",
+        name: "Away at Home",
+        shortName: "AWY @ HOM",
+        season: { year: 2026, type: 2 },
+        week: { number: 3 },
+        competitions: [
+          {
+            competitors: [
+              {
+                homeAway: "away",
+                score: 0,
+                team: { id: "away", displayName: "Away", logo: "away.svg" },
+                records: [{ summary: "0-2" }],
+              },
+              {
+                homeAway: "home",
+                score: 0,
+                team: { id: "home", displayName: "Home", logo: "home.svg" },
+                records: [{ summary: "1-1" }],
+              },
+            ],
+          },
+        ],
+        status: {
+          type: { state: "pre", completed: false, description: "Scheduled" },
+        },
+      },
+    ],
+  };
+  const fetchImpl = (payload: ESPNScoreboard) =>
+    (async () =>
+      new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
+
+  // Weekly rollover: the resync must overwrite the stale Week 1 snapshot with
+  // records through Week 2.
+  const { games } = await synchronizeSchedule(db, 2026, 3, {
+    fetchImpl: fetchImpl(week3Pre),
+    afterCommit: async () => undefined,
+  });
+  assert.equal(games[0].away.record, "0-2");
+  assert.equal(
+    (memory.records.get("games/game-3")?.away as { record?: string })?.record,
+    "0-2"
+  );
+
+  // Historical view after the game finished: ESPN folds the result into its
+  // record summary, but the stored record must stay the entering-week record.
+  const week3Post = structuredClone(week3Pre);
+  const event = week3Post.events![0];
+  event.status = {
+    type: { state: "post", completed: true, description: "Final" },
+  };
+  const [away, home] = event.competitions[0].competitors;
+  away.score = 34;
+  away.records = [{ summary: "1-2" }];
+  home.score = 3;
+  home.records = [{ summary: "1-2" }];
+
+  await synchronizeSchedule(db, 2026, 3, {
+    fetchImpl: fetchImpl(week3Post),
+    afterCommit: async () => undefined,
+  });
+  const stored = memory.records.get("games/game-3") as {
+    away: { record?: string };
+    home: { record?: string };
+  };
+  assert.equal(stored.away.record, "0-2");
+  assert.equal(stored.home.record, "1-1");
+});
+
 test("one malformed ESPN event prevents all writes and completeness updates", async () => {
   const memory = new MemoryFirestore();
   const db = memory as unknown as FirebaseFirestore.Firestore;

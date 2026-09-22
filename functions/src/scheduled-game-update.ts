@@ -1,7 +1,7 @@
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {getApps, initializeApp} from "firebase-admin/app";
 import {FieldValue, getFirestore} from "firebase-admin/firestore";
-import {normalizeESPNGame} from "./lib/espn-data";
+import {gameNeedsUpdate, normalizeESPNGame} from "./lib/espn-data";
 import {
   assertMatchingSchedule,
   buildScoreboardUrl,
@@ -118,23 +118,10 @@ export const updateGameScores = onSchedule(
           const gameDoc = await gameRef.get();
           const currentData = gameDoc.exists ? gameDoc.data() : null;
 
-          // Check if we need to update this game
-          let needsUpdate = false;
-
-          if (!currentData) {
-            // New game - always update
-            needsUpdate = true;
-          } else {
-            // Check if scores or status changed
-            const awayScoreChanged =
-              currentData.away?.score !== normalizedGame.away.score;
-            const homeScoreChanged =
-              currentData.home?.score !== normalizedGame.home.score;
-            const statusChanged =
-              currentData.status?.state !== normalizedGame.status.state;
-
-            needsUpdate = awayScoreChanged || homeScoreChanged || statusChanged;
-          }
+          // Check if we need to update this game. A record ESPN omitted is
+          // never a change: the merge payload preserves the stored value, so
+          // counting it would rewrite the document on every run.
+          const needsUpdate = gameNeedsUpdate(currentData, normalizedGame);
 
           if (needsUpdate) {
             // Update the game with latest data
@@ -145,12 +132,18 @@ export const updateGameScores = onSchedule(
                 id: normalizedGame.away.id,
                 name: normalizedGame.away.name,
                 logo: normalizedGame.away.logo,
+                ...(normalizedGame.away.record !== undefined && {
+                  record: normalizedGame.away.record,
+                }),
                 score: normalizedGame.away.score,
               },
               home: {
                 id: normalizedGame.home.id,
                 name: normalizedGame.home.name,
                 logo: normalizedGame.home.logo,
+                ...(normalizedGame.home.record !== undefined && {
+                  record: normalizedGame.home.record,
+                }),
                 score: normalizedGame.home.score,
               },
               status: {
@@ -316,12 +309,18 @@ async function updateWeekGames(week: number, year: number) {
           id: normalizedGame.away.id,
           name: normalizedGame.away.name,
           logo: normalizedGame.away.logo,
+          ...(normalizedGame.away.record !== undefined && {
+            record: normalizedGame.away.record,
+          }),
           score: normalizedGame.away.score,
         },
         home: {
           id: normalizedGame.home.id,
           name: normalizedGame.home.name,
           logo: normalizedGame.home.logo,
+          ...(normalizedGame.home.record !== undefined && {
+            record: normalizedGame.home.record,
+          }),
           score: normalizedGame.home.score,
         },
         status: {
