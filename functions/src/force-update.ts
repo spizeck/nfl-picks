@@ -82,12 +82,18 @@ export const forceUpdateWeek = onCall(async (request) => {
             id: normalizedGame.away.id,
             name: normalizedGame.away.name,
             logo: normalizedGame.away.logo,
+            ...(normalizedGame.away.record !== undefined && {
+              record: normalizedGame.away.record,
+            }),
             score: normalizedGame.away.score,
           },
           home: {
             id: normalizedGame.home.id,
             name: normalizedGame.home.name,
             logo: normalizedGame.home.logo,
+            ...(normalizedGame.home.record !== undefined && {
+              record: normalizedGame.home.record,
+            }),
             score: normalizedGame.home.score,
           },
           status: {

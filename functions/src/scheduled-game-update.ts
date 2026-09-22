@@ -125,15 +125,21 @@ export const updateGameScores = onSchedule(
             // New game - always update
             needsUpdate = true;
           } else {
-            // Check if scores or status changed
+            // Check if scores, records, or status changed
             const awayScoreChanged =
               currentData.away?.score !== normalizedGame.away.score;
             const homeScoreChanged =
               currentData.home?.score !== normalizedGame.home.score;
+            const awayRecordChanged =
+              currentData.away?.record !== normalizedGame.away.record;
+            const homeRecordChanged =
+              currentData.home?.record !== normalizedGame.home.record;
             const statusChanged =
               currentData.status?.state !== normalizedGame.status.state;
 
-            needsUpdate = awayScoreChanged || homeScoreChanged || statusChanged;
+            needsUpdate =
+              awayScoreChanged || homeScoreChanged || statusChanged ||
+              awayRecordChanged || homeRecordChanged;
           }
 
           if (needsUpdate) {
@@ -145,12 +151,18 @@ export const updateGameScores = onSchedule(
                 id: normalizedGame.away.id,
                 name: normalizedGame.away.name,
                 logo: normalizedGame.away.logo,
+                ...(normalizedGame.away.record !== undefined && {
+                  record: normalizedGame.away.record,
+                }),
                 score: normalizedGame.away.score,
               },
               home: {
                 id: normalizedGame.home.id,
                 name: normalizedGame.home.name,
                 logo: normalizedGame.home.logo,
+                ...(normalizedGame.home.record !== undefined && {
+                  record: normalizedGame.home.record,
+                }),
                 score: normalizedGame.home.score,
               },
               status: {
@@ -316,12 +328,18 @@ async function updateWeekGames(week: number, year: number) {
           id: normalizedGame.away.id,
           name: normalizedGame.away.name,
           logo: normalizedGame.away.logo,
+          ...(normalizedGame.away.record !== undefined && {
+            record: normalizedGame.away.record,
+          }),
           score: normalizedGame.away.score,
         },
         home: {
           id: normalizedGame.home.id,
           name: normalizedGame.home.name,
           logo: normalizedGame.home.logo,
+          ...(normalizedGame.home.record !== undefined && {
+            record: normalizedGame.home.record,
+          }),
           score: normalizedGame.home.score,
         },
         status: {

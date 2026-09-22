@@ -10,6 +10,7 @@ export interface NormalizedGame {
     name: string;
     logo: string;
     abbreviation?: string;
+    // Season record the team carried into this game (e.g. "1-1" or "1-0-1").
     record?: string;
     score?: number;
   };
@@ -18,6 +19,7 @@ export interface NormalizedGame {
     name: string;
     logo: string;
     abbreviation?: string;
+    // Season record the team carried into this game (e.g. "1-1" or "1-0-1").
     record?: string;
     score?: number;
   };
@@ -125,6 +127,19 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
     displayText = formatGameTime(gameDate);
   }
 
+  const awayRecord = enteringGameRecord(
+    awayTeam,
+    state,
+    awayTeam.score,
+    homeTeam.score
+  );
+  const homeRecord = enteringGameRecord(
+    homeTeam,
+    state,
+    homeTeam.score,
+    awayTeam.score
+  );
+
   return {
     eventId: event.id,
     date: event.date,
@@ -132,18 +147,14 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
       id: awayTeam.team.id,
       name: awayTeam.team.displayName,
       logo: awayTeam.team.logo,
-      ...(awayTeam.records?.[0]?.summary !== undefined && {
-        record: awayTeam.records[0].summary,
-      }),
+      ...(awayRecord !== undefined && { record: awayRecord }),
       ...(awayTeam.score !== undefined && { score: awayTeam.score }),
     },
     home: {
       id: homeTeam.team.id,
       name: homeTeam.team.displayName,
       logo: homeTeam.team.logo,
-      ...(homeTeam.records?.[0]?.summary !== undefined && {
-        record: homeTeam.records[0].summary,
-      }),
+      ...(homeRecord !== undefined && { record: homeRecord }),
       ...(homeTeam.score !== undefined && { score: homeTeam.score }),
     },
     status: {
@@ -152,6 +163,66 @@ export function normalizeESPNGame(event: ESPNEvent): NormalizedGame {
       ...(detail && { detail }),
     },
   };
+}
+
+/**
+ * Resolve the season record a team carried into a game.
+ *
+ * ESPN's overall record summary means different things depending on game
+ * state: for upcoming and in-progress games it is the record entering the
+ * game, but once a game is final ESPN folds that game's own result in. The
+ * matchup cards display the entering-game record, so undo the result for
+ * completed games ("2-0" after a win becomes "1-0").
+ */
+function enteringGameRecord(
+  competitor: ESPNCompetitor,
+  state: "pre" | "in" | "post",
+  teamScore: number | undefined,
+  opponentScore: number | undefined
+): string | undefined {
+  const summary = competitor.records?.[0]?.summary;
+  if (
+    summary === undefined ||
+    state !== "post" ||
+    teamScore === undefined ||
+    opponentScore === undefined
+  ) {
+    return summary;
+  }
+  const outcome =
+    teamScore > opponentScore
+      ? "win"
+      : teamScore < opponentScore
+        ? "loss"
+        : "tie";
+  return subtractGameResult(summary, outcome);
+}
+
+/**
+ * Remove a game's own result from a post-game record summary.
+ * Returns the original summary when it cannot be safely adjusted.
+ */
+function subtractGameResult(
+  summary: string,
+  outcome: "win" | "loss" | "tie"
+): string {
+  const match = /^(\d+)-(\d+)(?:-(\d+))?$/.exec(summary.trim());
+  if (!match) return summary;
+
+  let wins = Number(match[1]);
+  let losses = Number(match[2]);
+  let ties = match[3] === undefined ? 0 : Number(match[3]);
+
+  if (outcome === "win") wins -= 1;
+  else if (outcome === "loss") losses -= 1;
+  else ties -= 1;
+
+  // Inconsistent data (e.g. ESPN had not folded the result in yet): keep the
+  // reported summary rather than deriving an impossible record.
+  if (wins < 0 || losses < 0 || ties < 0) return summary;
+
+  // ESPN only renders the tie column when the team has a tie.
+  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
 }
 
 /**
