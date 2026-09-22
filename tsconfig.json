@@ -30,5 +30,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  // functions/ is a separate package (own tsconfig + CI job); the root
+  // typecheck must not pull it in via the **/*.ts globs.
+  "exclude": ["node_modules", "functions"]
 }
