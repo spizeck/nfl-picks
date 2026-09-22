@@ -79,7 +79,7 @@ updates:
       #   - next/eslint-config-next, react family, radix (dedicated groups)
       #   - firebase client SDK, firebase-admin, firebase-functions (post-
       #     outage policy: every Firebase update is conspicuous)
-      #   - framer-motion, lucide-react (previously deferred majors)
+      #   - lucide-react (previously deferred major)
       # Major updates for grouped packages also fall outside this group and
       # get their own PRs.
       minor-patch:
@@ -94,7 +94,6 @@ updates:
           - "react-dom"
           - "@radix-ui/*"
           - "firebase*"
-          - "framer-motion"
           - "lucide-react"
 
   # Firebase Functions project (functions/package-lock.json) — a separate
