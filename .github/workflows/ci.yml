@@ -12,9 +12,112 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Change-aware CI. The `Detect changes` job classifies the PR diff into
+# domains; each check below runs only when the diff can plausibly affect
+# its domain. Pushes to master always run the full suite.
+#
+# Required-check safety: the ruleset requires "App (Next.js)" and
+# "Functions (Firebase)". Gating uses job-level `if:` (never
+# workflow-level `paths:` filters): a skipped job reports Success and
+# satisfies required checks, while a filtered-out workflow would leave
+# them pending forever. The classifier fails safe: an uncomputable diff
+# or an unrecognized path runs everything.
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.classify.outputs.app }}
+      functions: ${{ steps.classify.outputs.functions }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: classify
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -u
+          app=false
+          functions=false
+          files=""
+
+          run_all() {
+            app=true; functions=true
+          }
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            # Full run on master.
+            run_all
+          else
+            files="$(git diff --name-only "origin/${BASE_REF}...HEAD" 2>/dev/null)" || files=""
+            if [ -z "$files" ]; then
+              # A real PR always has a diff; empty means the diff failed.
+              # Fail safe toward full coverage, never toward skipping it.
+              echo "::warning::Could not compute PR diff — running all domains"
+              run_all
+            fi
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+
+              # Cheap validation for config-only changes that no longer
+              # get exercised indirectly by a heavy suite.
+              case "$f" in
+                *.json)
+                  node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$f" || exit 1
+                  ;;
+                .github/workflows/*.yml|.github/workflows/*.yaml)
+                  if python3 -c "import yaml" 2>/dev/null; then
+                    python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1]))" "$f" || exit 1
+                  else
+                    echo "::warning::PyYAML unavailable; skipping workflow YAML validation for $f"
+                  fi
+                  ;;
+              esac
+
+              case "$f" in
+                # Docs / metadata / CI config: cannot affect runtime.
+                *.md|LICENSE|.github/*|.devin/*|.vscode/*|.env.example|.gitignore|.gitattributes|.vercelignore|vercel.json)
+                  ;;
+
+                # Firebase Functions package + Firebase config (the
+                # functions job is the Firebase-domain check: it lints and
+                # builds the functions tree against this configuration).
+                functions/*|firebase.json|.firebaserc|firestore.rules|firestore.indexes.json)
+                  functions=true ;;
+
+                # Root dependencies / runtime pin: both jobs npm-ci.
+                package.json|package-lock.json|.nvmrc)
+                  run_all ;;
+
+                # App source, assets, scripts and build config.
+                src/*|public/*|scripts/*|components.json|next.config.ts|postcss.config.mjs|eslint.config.mjs|tsconfig.json)
+                  app=true ;;
+
+                # Unknown change: run everything.
+                *)
+                  run_all ;;
+              esac
+            done <<< "$files"
+          fi
+
+          echo "Changed files:"
+          echo "$files"
+          echo "Domains: app=$app functions=$functions"
+          {
+            echo "app=$app"
+            echo "functions=$functions"
+          } >> "$GITHUB_OUTPUT"
+
   app:
     name: App (Next.js)
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,6 +151,8 @@ jobs:
 
   functions:
     name: Functions (Firebase)
+    needs: changes
+    if: needs.changes.outputs.functions == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
