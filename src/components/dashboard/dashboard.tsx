@@ -60,6 +60,9 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
   // Mirror of savedPicks so async refetches can tell which local selections
   // are unsaved edits that must survive a refresh.
   const savedPicksRef = useRef<Record<string, PickSide>>({});
+  // Bumped after every successful save so a pick fetch started before the
+  // save can't overwrite the newer baseline when it lands.
+  const pickSaveVersionRef = useRef(0);
   const now = useNow();
 
   useEffect(() => {
@@ -181,6 +184,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
       const auth = getFirebaseAuth();
       if (!auth?.currentUser) return;
 
+      const saveVersion = pickSaveVersionRef.current;
       try {
         const token = await auth.currentUser.getIdToken();
         const response = await fetch(
@@ -191,6 +195,10 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
             },
           }
         );
+
+        // A save completed while this request was in flight — the response
+        // predates it, so applying it would roll the baseline backwards.
+        if (saveVersion !== pickSaveVersionRef.current) return;
 
         if (response.ok) {
           const data: UserPick[] = await response.json();
@@ -289,6 +297,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
     const submittedPicks = picks;
     const baseline = savedPicks;
     const currentUser = auth.currentUser;
+    const submittedWeekKey = `${currentYear}:${selectedWeek}`;
 
     setSaving(true);
     setSaveError(null);
@@ -301,6 +310,13 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
         year: currentYear,
         getIdToken: () => currentUser.getIdToken(),
       });
+
+      // The user navigated to a different week while the save was in flight;
+      // that week's state was already reset, so don't apply this week's
+      // results into it.
+      if (loadedWeekKeyRef.current !== submittedWeekKey) return;
+
+      pickSaveVersionRef.current += 1;
 
       // Mark only the picks that actually persisted as saved; a failure on
       // one game must not mask another game's successful write.
