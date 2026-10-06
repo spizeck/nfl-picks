@@ -77,6 +77,15 @@ export function PwaControls() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!showInstructions) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowInstructions(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showInstructions]);
+
   const handleInstall = async () => {
     if (!installPrompt) {
       setShowInstructions(true);
@@ -109,8 +118,11 @@ export function PwaControls() {
       )}
 
       {showInstructions && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="install-title" className="w-full max-w-sm rounded-lg border bg-card p-5 shadow-lg">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowInstructions(false)}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="install-title" className="w-full max-w-sm rounded-lg border bg-card p-5 shadow-lg" onClick={(event) => event.stopPropagation()}>
             <h2 id="install-title" className="text-lg font-semibold">Install NFL Picks</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               {isiOS

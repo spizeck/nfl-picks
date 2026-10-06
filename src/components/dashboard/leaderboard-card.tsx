@@ -188,6 +188,7 @@ export function LeaderboardCard({
                   onClick={() => setTimePeriod("week")}
                   className="font-semibold"
                   disabled={!selectedWeek}
+                  aria-pressed={timePeriod === "week"}
                 >
                   Week
                 </Button>
@@ -196,6 +197,7 @@ export function LeaderboardCard({
                   variant={timePeriod === "season" ? "default" : "outline"}
                   onClick={() => setTimePeriod("season")}
                   className="font-semibold"
+                  aria-pressed={timePeriod === "season"}
                 >
                   Season
                 </Button>
@@ -204,6 +206,7 @@ export function LeaderboardCard({
                   variant={timePeriod === "allTime" ? "default" : "outline"}
                   onClick={() => setTimePeriod("allTime")}
                   className="font-semibold"
+                  aria-pressed={timePeriod === "allTime"}
                 >
                   All Time
                 </Button>
@@ -216,6 +219,7 @@ export function LeaderboardCard({
                 variant={sortBy === "percentage" ? "default" : "outline"}
                 onClick={() => setSortBy("percentage")}
                 className="font-semibold"
+                aria-pressed={sortBy === "percentage"}
               >
                 Win %
               </Button>
@@ -224,6 +228,7 @@ export function LeaderboardCard({
                 variant={sortBy === "wins" ? "default" : "outline"}
                 onClick={() => setSortBy("wins")}
                 className="font-semibold"
+                aria-pressed={sortBy === "wins"}
               >
                 Total Wins
               </Button>

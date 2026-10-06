@@ -1,10 +1,11 @@
 "use client";
 
 import type { NormalizedGame } from "@/lib/espn-data";
+import { hasGameStarted } from "@/lib/game-lock";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
-import { Check, X } from "lucide-react";
+import { Check, Lock, X } from "lucide-react";
 
 interface UserPickInfo {
   userId: string;
@@ -18,7 +19,14 @@ interface GamePickCardProps {
   game: NormalizedGame;
   selectedSide?: "away" | "home";
   onPickChange: (gameId: string, side: "away" | "home") => void;
-  disabled?: boolean;
+  /** Per-game pick lock: kicked off or no longer in a pre-game state. */
+  locked?: boolean;
+  /** Shared clock tick from the parent so all cards lock together on time. */
+  now: number;
+  /** The selected pick differs from the last persisted pick. */
+  unsaved?: boolean;
+  /** Save failure specific to this game, shown inline under the status. */
+  saveError?: string;
   userPicks?: UserPickInfo[];
 }
 
@@ -26,16 +34,17 @@ export function GamePickCard({
   game,
   selectedSide,
   onPickChange,
-  disabled,
+  locked = false,
+  now,
+  unsaved = false,
+  saveError,
   userPicks = [],
 }: GamePickCardProps) {
   const isAwaySelected = selectedSide === "away";
   const isHomeSelected = selectedSide === "home";
   const isGameLive = game.status.state === "in";
   const isGameFinal = game.status.state === "post";
-  const gameStartTime = new Date(game.date);
-  const now = new Date();
-  const hasGameStarted = gameStartTime <= now;
+  const started = hasGameStarted(game, now);
 
   // Format the display time in user's local timezone
   const formatLocalTime = (dateString: string) => {
@@ -52,10 +61,10 @@ export function GamePickCard({
   // Get the local time for display
   const localDisplayTime = !isGameFinal && !isGameLive ? formatLocalTime(game.date) : game.status.displayText;
 
-  const awayPicks = hasGameStarted
+  const awayPicks = started
     ? userPicks.filter((p) => p.selectedTeam === game.away.id)
     : [];
-  const homePicks = hasGameStarted
+  const homePicks = started
     ? userPicks.filter((p) => p.selectedTeam === game.home.id)
     : [];
 
@@ -89,36 +98,57 @@ export function GamePickCard({
   }
 
   const handleAwayClick = () => {
-    if (!disabled) {
+    if (!locked) {
       onPickChange(game.eventId, "away");
     }
   };
 
   const handleHomeClick = () => {
-    if (!disabled) {
+    if (!locked) {
       onPickChange(game.eventId, "home");
     }
   };
 
+  const teamButtonClass = (selected: boolean) =>
+    cn(
+      "group relative p-4 transition-colors touch-manipulation",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+      selected ? "bg-muted" : "bg-transparent",
+      locked
+        ? "cursor-not-allowed opacity-60"
+        : "cursor-pointer hover:bg-muted active:bg-muted/80"
+    );
+
+  const selectionBarClass = (side: "away" | "home") =>
+    cn(
+      "absolute top-0 h-full w-1 bg-foreground",
+      side === "away" ? "left-0" : "right-0"
+    );
+
+  const teamInnerClass =
+    "flex flex-col items-center justify-center h-full gap-2 transition-transform duration-100 ease-out motion-safe:group-active:scale-[0.96]";
+
   return (
-    <div className="border rounded-none border-b-0 last:border-b overflow-hidden bg-card hover:bg-muted/50 transition-colors">
-      <div className="grid grid-cols-3 items-stretch min-h-120px">
+    <div
+      className={cn(
+        "border rounded-none border-b-0 last:border-b overflow-hidden bg-card transition-colors",
+        !locked && "hover:bg-muted/50"
+      )}
+    >
+      <div className="grid grid-cols-3 items-stretch min-h-[120px]">
         {/* LEFT: Away Team */}
         <button
           onClick={handleAwayClick}
-          disabled={disabled}
-          className={cn(
-            "p-4 border-r transition-all",
-            isAwaySelected
-              ? "bg-muted border-l-4 border-l-foreground"
-              : "bg-transparent",
-            disabled
-              ? "cursor-not-allowed opacity-60"
-              : "cursor-pointer hover:bg-muted"
-          )}
+          disabled={locked}
+          className={cn(teamButtonClass(isAwaySelected), "border-r")}
           aria-pressed={isAwaySelected}
+          aria-label={`Pick ${game.away.name}`}
+          title={locked ? "Picks are locked for this game" : undefined}
         >
-          <div className="flex flex-col items-center justify-center h-full gap-2">
+          {isAwaySelected && (
+            <span className={selectionBarClass("away")} aria-hidden="true" />
+          )}
+          <div className={teamInnerClass}>
             {game.away.logo ? (
               <Image
                 src={game.away.logo}
@@ -151,8 +181,13 @@ export function GamePickCard({
                   {game.away.record}
                 </p>
               )}
+              {isAwaySelected && unsaved && (
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                  Unsaved
+                </p>
+              )}
             </div>
-            {hasGameStarted && awayPicks.length > 0 && (
+            {started && awayPicks.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1 justify-center">
                 {awayPicks.map((pick) => (
                   <div key={pick.userId} className="relative">
@@ -209,8 +244,24 @@ export function GamePickCard({
               )}
             </>
           ) : (
-            <p className="text-xs text-muted-foreground text-center">
-              {localDisplayTime}
+            <>
+              <p className="text-xs text-muted-foreground text-center">
+                {localDisplayTime}
+              </p>
+              {locked && (
+                <p className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                  <Lock className="h-3 w-3" aria-hidden="true" />
+                  Locked
+                </p>
+              )}
+            </>
+          )}
+          {locked && !selectedSide && !isGameFinal && (
+            <p className="text-[11px] text-muted-foreground">No pick</p>
+          )}
+          {saveError && (
+            <p role="alert" className="text-xs text-destructive text-center">
+              {saveError}
             </p>
           )}
         </div>
@@ -218,19 +269,16 @@ export function GamePickCard({
         {/* RIGHT: Home Team */}
         <button
           onClick={handleHomeClick}
-          disabled={disabled}
-          className={cn(
-            "p-4 border-l transition-all",
-            isHomeSelected
-              ? "bg-muted border-l-4 border-l-foreground"
-              : "bg-transparent",
-            disabled
-              ? "cursor-not-allowed opacity-60"
-              : "cursor-pointer hover:bg-muted"
-          )}
+          disabled={locked}
+          className={cn(teamButtonClass(isHomeSelected), "border-l")}
           aria-pressed={isHomeSelected}
+          aria-label={`Pick ${game.home.name}`}
+          title={locked ? "Picks are locked for this game" : undefined}
         >
-          <div className="flex flex-col items-center justify-center h-full gap-2">
+          {isHomeSelected && (
+            <span className={selectionBarClass("home")} aria-hidden="true" />
+          )}
+          <div className={teamInnerClass}>
             {game.home.logo ? (
               <Image
                 src={game.home.logo}
@@ -263,8 +311,13 @@ export function GamePickCard({
                   {game.home.record}
                 </p>
               )}
+              {isHomeSelected && unsaved && (
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                  Unsaved
+                </p>
+              )}
             </div>
-            {hasGameStarted && homePicks.length > 0 && (
+            {started && homePicks.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1 justify-center">
                 {homePicks.map((pick) => (
                   <div key={pick.userId} className="relative">

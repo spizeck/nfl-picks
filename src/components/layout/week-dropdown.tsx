@@ -22,14 +22,20 @@ export function WeekDropdown({ selectedWeek, onWeekChange }: WeekDropdownProps) 
     { value: 22, label: "Super Bowl" },
   ];
 
+  const playoffLabel = playoffWeeks.find((p) => p.value === selectedWeek)?.label;
+  const triggerLabel =
+    selectedWeek === null
+      ? "Select Week"
+      : `Week ${selectedWeek}${playoffLabel ? ` · ${playoffLabel}` : ""}`;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          {selectedWeek ? `Week ${selectedWeek}` : "Select Week"}
+          {triggerLabel}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="max-h-300px overflow-y-auto">
+      <DropdownMenuContent className="max-h-[300px] overflow-y-auto">
         {regularSeasonWeeks.map((week) => (
           <DropdownMenuItem
             key={week}
