@@ -148,6 +148,9 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
         const rawEvents = await response.json();
         // The games API returns normalized data directly
         const normalized = rawEvents;
+        // A newer week was selected while this request was in flight — its
+        // fetch owns the list now, so this response is stale.
+        if (loadedWeekKeyRef.current !== weekKey) return;
         setGames(normalized);
         hasGamesRef.current = normalized.length > 0;
         setLoadError(null);
@@ -164,7 +167,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
         const response = await fetch(
           `/api/all-picks?week=${selectedWeek}&year=${currentYear}`
         );
-        if (response.ok) {
+        if (response.ok && loadedWeekKeyRef.current === weekKey) {
           const data = await response.json();
           setAllUsersPicks(data);
         }
@@ -184,6 +187,7 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
       const auth = getFirebaseAuth();
       if (!auth?.currentUser) return;
 
+      const requestWeekKey = `${currentYear}:${selectedWeek}`;
       const saveVersion = pickSaveVersionRef.current;
       try {
         const token = await auth.currentUser.getIdToken();
@@ -196,9 +200,15 @@ export function Dashboard({ user, selectedWeek, onWeekChange }: DashboardProps) 
           }
         );
 
-        // A save completed while this request was in flight — the response
-        // predates it, so applying it would roll the baseline backwards.
-        if (saveVersion !== pickSaveVersionRef.current) return;
+        // Discard stale responses: the user switched weeks, or a save
+        // completed while this request was in flight — either way, applying
+        // it would overwrite newer state.
+        if (
+          loadedWeekKeyRef.current !== requestWeekKey ||
+          saveVersion !== pickSaveVersionRef.current
+        ) {
+          return;
+        }
 
         if (response.ok) {
           const data: UserPick[] = await response.json();
