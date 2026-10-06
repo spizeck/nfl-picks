@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Saving picks now submits only selections that actually changed. Previously every stored pick in the week was re-submitted, so after an earlier game kicked off, editing a later game produced a "game has already started" error even though the change saved successfully.
+- Save results are reconciled per game: one game's failure no longer masks another game's successful save, locked-game rejections revert to the persisted pick, and errors name the affected matchup.
+- Games lock picks based on their own kickoff time, so a game that starts while the page is open now locks on its own within seconds; returning to the tab also silently refreshes games and picks.
+- Background refreshes no longer discard unsaved pick selections.
+- The Retry control after a games-load failure now actually retries loading games instead of only re-requesting the current week.
+- Changing weeks with unsaved picks asks for confirmation instead of silently discarding the changes.
+
+### Improved
+
+- Pick buttons show pressed and focus-visible feedback, an "Unsaved" marker on changed selections, a lock indicator with "No pick" status for locked games, and per-game save errors inline.
+- Locked game rows no longer highlight on hover as if they were clickable.
+- The week/save controls stay pinned while scrolling so saving doesn't require scrolling back to the top on mobile.
+- Buttons get a subtle press response, the week dropdown shows postseason round names, and reduced-motion users get instant state changes.
+
 ## 1.2.0
 
 ### Added
